@@ -10,8 +10,22 @@
 
 namespace {
 
-constexpr double pi = 3.141592653589793238462643383279502884;
-constexpr double euler = 2.718281828459045235360287471352662498;
+// Dynamic high-precision evaluation functions for mathematical constants
+double compute_pi() {
+    return 4.0 * std::atan(1.0);
+}
+
+double compute_euler() {
+    // Fast-converging series expansion: e = sum_{k=0}^{infinity} 1 / k!
+    // 25 terms exceeds IEEE 754 double precision limit (53 bits, ~1.11e-16 epsilon)
+    double sum = 0.0;
+    double term = 1.0;
+    for (int k = 1; k <= 25; ++k) {
+        sum += term;
+        term /= static_cast<double>(k);
+    }
+    return sum;
+}
 
 struct ParsedValue {
     double numeric;
@@ -212,8 +226,8 @@ private:
             const bool exact = result == std::floor(result);
             return {result, exact ? number_text(result) : function + "(" + argument.exact + ")", !exact};
         }
-        if (match_word("pi")) return {pi, "π", true};
-        if (match_word("e")) return {euler, "e", true};
+        if (match_pi()) return {compute_pi(), "π", true};
+        if (match_word("e")) return {compute_euler(), "e", true};
 
         char* end = nullptr;
         const double value = std::strtod(input_ + position_, &end);
@@ -240,6 +254,22 @@ private:
         }
         ++position_;
         return value;
+    }
+
+    bool match_pi() {
+        skip_whitespace();
+        if (input_[position_] == 'p' && input_[position_ + 1] == 'i') {
+            if (!std::isalnum(static_cast<unsigned char>(input_[position_ + 2])) && input_[position_ + 2] != '_') {
+                position_ += 2;
+                return true;
+            }
+        }
+        if (static_cast<unsigned char>(input_[position_]) == 0xCF &&
+            static_cast<unsigned char>(input_[position_ + 1]) == 0x80) {
+            position_ += 2;
+            return true;
+        }
+        return false;
     }
 
     bool match_word(const char* word) {

@@ -114,12 +114,16 @@ h1 {
   min-width: 0;
   flex: 1;
   flex-direction: column;
+  position: relative;
+  height: 100vh;
+  overflow: hidden;
   padding: 34px clamp(28px, 5vw, 76px);
 }
 
 .page-header {
   display: flex;
   justify-content: flex-end;
+  flex: 0 0 auto;
 }
 
 .page-kicker {
@@ -133,13 +137,14 @@ h1 {
 .page-content {
   display: flex;
   flex: 1;
-  align-items: flex-start;
-  justify-content: flex-start;
-  padding: 24px 0 0;
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
 }
 
 .empty-page {
   width: min(700px, 100%);
+  padding-top: clamp(80px, 15vh, 180px);
 }
 
 .empty-page h2 {
@@ -150,220 +155,338 @@ h1 {
   line-height: 1.05;
 }
 
-.arithmetic-page {
-  width: min(980px, 100%);
-  height: 100%;
+/* ========================================================
+   Arithmetic Workspace - Inverted Bottom-Left Push-Up Stack
+   ======================================================== */
+.arithmetic-container {
+  position: absolute;
+  bottom: 18px;
+  left: 0;
+  width: min(840px, 100%);
+  max-height: calc(100vh - 120px);
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  padding-bottom: 12px;
+  outline: none;
 }
 
-.arithmetic-heading {
-  border-bottom: 1px solid var(--line);
-  margin-bottom: 12px;
-  padding-bottom: 24px;
+.arithmetic-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 10px;
 }
 
-.arithmetic-page h2 {
-  margin: 8px 0 6px;
+.arithmetic-toolbar-title {
+  color: #8e948c;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.add-expression-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #363a36;
+  border-radius: 6px;
+  background: #111411;
+  color: var(--light-gray);
+  cursor: pointer;
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.add-expression-btn:hover {
+  background: #202420;
+  border-color: #4a504a;
   color: var(--white);
-  font-size: clamp(1.8rem, 4vw, 2.6rem);
-  font-weight: 500;
-  letter-spacing: -0.04em;
 }
 
-.page-description {
-  max-width: 680px;
-  margin: 0;
-  color: var(--gray);
-  line-height: 1.5;
-}
-
-.expression-list {
-  display: grid;
-  gap: 0;
-  max-height: min(62vh, 620px);
+.expression-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: calc(100vh - 190px);
   overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px;
   scrollbar-width: thin;
-  scrollbar-color: #414541 transparent;
+  scrollbar-color: #363b36 transparent;
+}
+
+.expression-stack > :first-child {
+  margin-top: auto;
 }
 
 .expression-row {
-  border-bottom: 1px solid var(--line);
-  padding: 8px 0 12px;
+  border: 1px solid #202420;
+  border-radius: 8px;
+  background: #0b0d0b;
+  min-height: 52px;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 12px;
+  transition: border-color 120ms ease, background-color 120ms ease;
+  flex-shrink: 0;
 }
 
-.expression-line {
+.expression-row.active {
+  border-color: #4d544c;
+  background: #111411;
+}
+
+.expression-row-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 38px;
+  height: auto;
+}
+
+.row-number {
+  width: 24px;
+  flex: 0 0 24px;
+  color: #60665f;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 0.85rem;
+  text-align: right;
+  user-select: none;
+}
+
+.expression-row.active .row-number {
+  color: #d0d6cc;
+  font-weight: 600;
+}
+
+.expression-editor-area {
+  flex: 1;
+  min-width: 0;
+  height: auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  font-family: "Cambria Math", "Times New Roman", serif;
+  font-size: clamp(1.3rem, 2.2vw, 1.6rem);
+  line-height: 1.35;
+  color: var(--white);
+  cursor: text;
+  user-select: none;
+  overflow: visible;
+}
+
+.row-delete-btn {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: #6a7069;
+  cursor: pointer;
+  font-size: 1.15rem;
+  line-height: 1;
+  transition: color 120ms ease, background-color 120ms ease;
+}
+
+.row-delete-btn:hover:not(:disabled) {
+  background: #252825;
+  color: #f4f4f0;
+}
+
+.row-delete-btn:disabled {
+  opacity: 0.18;
+  cursor: not-allowed;
+}
+
+.expression-row-result {
+  margin-left: 36px;
+  margin-top: 4px;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 0.88rem;
+  color: #b0b6ae;
+  min-height: 18px;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.line-number {
-  width: 28px;
-  color: #626762;
-  font: 0.78rem "Cascadia Mono", Consolas, monospace;
-  text-align: right;
+.expression-row-result.has-error {
+  color: #c98080;
 }
 
-.expression-editor {
-  position: relative;
-  min-height: 48px;
-  flex: 1;
-  overflow: hidden;
+/* ========================================================
+   Mathematical Elements Formatting
+   ======================================================== */
+.math-char {
+  display: inline-block;
+  white-space: pre;
 }
 
-.math-display,
-.expression-editor textarea {
-  width: 100%;
-  min-height: 48px;
-  margin: 0;
-  border: 0;
-  padding: 9px 12px;
-  font-family: "Cambria Math", "Times New Roman", serif;
-  font-size: clamp(1.35rem, 2.4vw, 1.65rem);
-  line-height: 1.3;
+.math-operator {
+  padding: 0 3px;
+  color: #d6ded3;
 }
 
-.math-display {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  color: var(--white);
-  pointer-events: none;
-  white-space: pre-wrap;
-}
-
-.expression-editor textarea {
-  position: relative;
-  display: block;
-  resize: none;
-  overflow: hidden;
-  background: transparent;
-  color: transparent;
-  caret-color: var(--white);
-  font-family: "Cascadia Mono", Consolas, monospace;
-  outline: 0;
-}
-
-.expression-editor:focus-within {
-  background: #171917;
-  box-shadow: inset 2px 0 #777b77;
-}
-
-.editor-placeholder {
-  color: #575b57;
-  font-size: 1.1rem;
-}
-
-.add-expression {
-  border: 1px solid #4a4e4a;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--light-gray);
-  cursor: pointer;
-  margin: 18px 0 0 36px;
-  padding: 9px 14px;
-}
-
-.add-expression:hover {
-  background: var(--hover);
-  color: var(--white);
-}
-
-.row-action {
-  width: 28px;
-  height: 28px;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  background: transparent;
-  color: #777c77;
-  cursor: pointer;
-  font-size: 1.1rem;
-}
-
-.row-action:hover {
-  border-color: #4a4e4a;
-  color: var(--white);
-}
-
-.remove-row {
-  color: #9a8181;
-}
-
-.math-power sup,
-.nth-root sup {
-  font-size: 0.7em;
-}
-
-.math-root {
-  display: inline-flex;
-  align-items: flex-start;
-}
-
-.math-root > span {
-  border-top: 1px solid var(--white);
-  padding: 1px 3px 0;
-}
-
-.math-log,
-.math-function {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.math-log sub {
-  align-self: flex-end;
-  font-size: 0.55em;
-  line-height: 1;
-}
-
-.math-log > span,
-.math-function > span {
-  margin-left: 2px;
+.math-paren {
+  font-weight: 300;
+  padding: 0 1px;
+  color: #c0c6bd;
 }
 
 .math-fraction {
   display: inline-flex;
   flex-direction: column;
-  max-width: 100%;
   vertical-align: middle;
   text-align: center;
-  line-height: 1.1;
-  overflow-wrap: anywhere;
+  margin: 0 3px;
+  padding: 2px 0;
+  line-height: 1.15;
 }
 
-.math-fraction span:first-child {
-  border-bottom: 1px solid var(--light-gray);
+.math-numerator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 0 4px 2px;
+  min-height: 1.1em;
 }
 
-.math-fraction span:last-child {
+.math-fraction-line {
+  width: 100%;
+  height: 1.5px;
+  background: #c6ccc2;
+  margin: 1px 0;
+}
+
+.math-denominator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 2px 4px 0;
+  min-height: 1.1em;
 }
 
-.expression-result {
-  min-height: 20px;
-  margin: 2px 0 0 36px;
-  color: #d7dbd6;
-  font-family: "Cascadia Mono", Consolas, monospace;
-  font-size: 0.9rem;
+.math-sqrt,
+.math-root {
+  display: inline-flex;
+  align-items: stretch;
+  margin: 0 2px;
 }
 
-.expression-result.has-error {
-  color: #c99090;
+.math-sqrt-radical {
+  font-size: 1.25em;
+  line-height: 0.95;
+  padding-right: 1px;
 }
 
-.syntax-note {
-  margin: 18px 0 0 36px;
-  color: #626762;
-  font-size: 0.82rem;
+.math-sqrt-content {
+  border-top: 1.5px solid #c6ccc2;
+  padding: 2px 4px 0;
+  display: inline-flex;
+  align-items: center;
 }
 
-.syntax-note code {
-  color: #aeb4ad;
+.math-root-index {
+  font-size: 0.6em;
+  margin-right: -4px;
+  margin-bottom: 6px;
+}
+
+.math-exponent {
+  display: inline-flex;
+  vertical-align: super;
+  font-size: 0.72em;
+  margin-left: 1px;
+}
+
+.math-exponent-power {
+  display: inline-flex;
+  align-items: center;
+}
+
+.math-log-block,
+.math-ln-block {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 1px;
+}
+
+.math-word {
+  font-style: normal;
+  font-family: "Segoe UI", sans-serif;
+  font-size: 0.92em;
+  margin-right: 1px;
+  color: #c6ccc2;
+}
+
+.math-log-base {
+  font-size: 0.6em;
+  vertical-align: sub;
+  margin-right: 1px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.math-log-arg,
+.math-ln-arg {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Explicit Placeholders */
+.math-slot.empty {
+  display: inline-block;
+  min-width: 16px;
+  min-height: 22px;
+  border: 1px dashed #6b706b;
+  border-radius: 3px;
+  vertical-align: middle;
+  margin: 0 2px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.math-slot.empty.focused {
+  border-color: #a4aaa2;
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.math-slot.root-empty {
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+}
+
+.math-placeholder {
+  color: #555a54;
+  font-size: 0.9em;
+  font-family: "Segoe UI", sans-serif;
+  font-style: italic;
+  pointer-events: none;
+}
+
+/* Synchronous Blinking Cursor */
+.math-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1.25em;
+  background-color: #ffffff;
+  vertical-align: middle;
+  margin: 0 1px;
+  animation: math-cursor-blink 1s infinite steps(1);
+  pointer-events: none;
+}
+
+@keyframes math-cursor-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
 }
 
 @media (max-width: 720px) {

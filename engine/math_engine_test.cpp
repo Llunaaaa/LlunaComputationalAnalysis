@@ -34,10 +34,16 @@ int main() {
     assert_value("root(3)(27)", 3.0);
     assert_value("root(3)(-8)", -2.0);
     assert_value("5!", 120.0);
+    assert_value("0!", 1.0);
+    assert_value("1!", 1.0);
     assert_value("log(100)", 2.0);
     assert_value("log(2)(8)", 3.0);
     assert_value("ln(e)", 1.0);
+    assert_value("pi", 4.0 * std::atan(1.0));
+    assert_value("π", 4.0 * std::atan(1.0));
+    assert_value("e", std::exp(1.0));
     assert_exact("pi", "π");
+    assert_exact("π", "π");
     assert_exact("e", "e");
     assert_exact("sqrt(2)", "sqrt(2)");
     assert_exact("log(2)", "log(2)");
