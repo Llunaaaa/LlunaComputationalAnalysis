@@ -2,6 +2,7 @@
 
 #include <cctype>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <stdexcept>
@@ -9,16 +10,31 @@
 
 namespace {
 
+constexpr double pi = 3.141592653589793238462643383279502884;
+constexpr double euler = 2.718281828459045235360287471352662498;
+
+struct ParsedValue {
+    double numeric;
+    std::string exact;
+    bool symbolic;
+};
+
+std::string number_text(double value) {
+    char buffer[64]{};
+    std::snprintf(buffer, sizeof(buffer), "%.15g", value);
+    return buffer;
+}
+
 class Parser {
 public:
     explicit Parser(const char* input) : input_(input), position_(0) {}
 
-    double parse() {
+    ParsedValue parse() {
         skip_whitespace();
         if (at_end()) {
             throw std::runtime_error("Enter an expression");
         }
-        const double value = parse_expression();
+        ParsedValue value = parse_expression();
         skip_whitespace();
         if (!at_end()) {
             throw std::runtime_error("Unexpected character in expression");
@@ -27,8 +43,8 @@ public:
     }
 
 private:
-    double parse_expression() {
-        double value = parse_term();
+    ParsedValue parse_expression() {
+        ParsedValue value = parse_term();
         while (true) {
             skip_whitespace();
             const char operation = input_[position_];
@@ -36,13 +52,18 @@ private:
                 return value;
             }
             ++position_;
-            const double right = parse_term();
-            value = operation == '+' ? value + right : value - right;
+            const ParsedValue right = parse_term();
+            value.numeric = operation == '+' ? value.numeric + right.numeric
+                                             : value.numeric - right.numeric;
+            value.symbolic = value.symbolic || right.symbolic;
+            value.exact = value.symbolic
+                ? "(" + value.exact + operation + right.exact + ")"
+                : number_text(value.numeric);
         }
     }
 
-    double parse_term() {
-        double value = parse_unary();
+    ParsedValue parse_term() {
+        ParsedValue value = parse_unary();
         while (true) {
             skip_whitespace();
             const char operation = input_[position_];
@@ -50,15 +71,23 @@ private:
                 return value;
             }
             ++position_;
-            const double right = parse_unary();
-            if (operation == '/' && right == 0.0) {
+            const ParsedValue right = parse_unary();
+            if (operation == '/' && right.numeric == 0.0) {
                 throw std::runtime_error("Cannot divide by zero");
             }
-            value = operation == '*' ? value * right : value / right;
+            value.numeric = operation == '*' ? value.numeric * right.numeric
+                                             : value.numeric / right.numeric;
+            if (!std::isfinite(value.numeric)) {
+                throw std::runtime_error("The result is not finite");
+            }
+            value.symbolic = value.symbolic || right.symbolic;
+            value.exact = value.symbolic
+                ? "(" + value.exact + operation + right.exact + ")"
+                : number_text(value.numeric);
         }
     }
 
-    double parse_unary() {
+    ParsedValue parse_unary() {
         skip_whitespace();
         if (input_[position_] == '+') {
             ++position_;
@@ -66,69 +95,125 @@ private:
         }
         if (input_[position_] == '-') {
             ++position_;
-            return -parse_unary();
+            ParsedValue value = parse_unary();
+            value.numeric = -value.numeric;
+            value.exact = value.symbolic ? "-(" + value.exact + ")" : number_text(value.numeric);
+            return value;
         }
         return parse_power();
     }
 
-    double parse_power() {
-        double value = parse_primary();
+    ParsedValue parse_power() {
+        ParsedValue value = parse_postfix();
         skip_whitespace();
         if (input_[position_] == '^') {
             ++position_;
-            const double exponent = parse_unary();
-            value = std::pow(value, exponent);
-            if (!std::isfinite(value)) {
+            const ParsedValue exponent = parse_unary();
+            value.numeric = std::pow(value.numeric, exponent.numeric);
+            if (!std::isfinite(value.numeric)) {
                 throw std::runtime_error("The result is not finite");
             }
+            value.symbolic = value.symbolic || exponent.symbolic;
+            value.exact = value.symbolic
+                ? "(" + value.exact + "^" + exponent.exact + ")"
+                : number_text(value.numeric);
         }
         return value;
     }
 
-    double parse_primary() {
+    ParsedValue parse_postfix() {
+        ParsedValue value = parse_primary();
+        while (true) {
+            skip_whitespace();
+            if (input_[position_] != '!') {
+                return value;
+            }
+            ++position_;
+            if (value.numeric < 0.0 || std::floor(value.numeric) != value.numeric ||
+                value.numeric > 170.0) {
+                throw std::runtime_error("Factorial requires an integer from 0 to 170");
+            }
+            double factorial = 1.0;
+            for (int index = 2; index <= static_cast<int>(value.numeric); ++index) {
+                factorial *= index;
+            }
+            value.numeric = factorial;
+            value.exact = number_text(factorial);
+            value.symbolic = false;
+        }
+    }
+
+    ParsedValue parse_primary() {
         skip_whitespace();
         if (input_[position_] == '(') {
             ++position_;
-            const double value = parse_expression();
+            ParsedValue value = parse_expression();
             skip_whitespace();
             if (input_[position_] != ')') {
                 throw std::runtime_error("Missing closing parenthesis");
             }
             ++position_;
+            value.exact = "(" + value.exact + ")";
             return value;
         }
-
-        if (match_function("sqrt")) {
-            const double value = parse_function_argument("sqrt");
-            if (value < 0.0) {
+        if (match_word("sqrt")) {
+            const ParsedValue argument = parse_function_argument("sqrt");
+            if (argument.numeric < 0.0) {
                 throw std::runtime_error("Cannot take the square root of a negative value");
             }
-            return std::sqrt(value);
+            const double result = std::sqrt(argument.numeric);
+            const bool exact = result == std::floor(result);
+            return {result, exact ? number_text(result) : "sqrt(" + argument.exact + ")", !exact};
         }
-
-        if (match_function("root")) {
-            const double index = parse_function_argument("root");
-            skip_whitespace();
-            if (input_[position_] != '(') {
-                throw std::runtime_error("Root requires an expression in parentheses");
-            }
-            ++position_;
-            const double value = parse_expression();
-            skip_whitespace();
-            if (input_[position_] != ')') {
-                throw std::runtime_error("Missing closing parenthesis");
-            }
-            ++position_;
-            if (!std::isfinite(index) || index <= 0.0 ||
-                std::floor(index) != index) {
+        if (match_word("root")) {
+            const ParsedValue index = parse_function_argument("root");
+            const ParsedValue argument = parse_function_argument("root");
+            if (index.numeric <= 0.0 || std::floor(index.numeric) != index.numeric) {
                 throw std::runtime_error("Root index must be a positive integer");
             }
-            if (value < 0.0 && std::fmod(index, 2.0) == 0.0) {
+            if (argument.numeric < 0.0 && std::fmod(index.numeric, 2.0) == 0.0) {
                 throw std::runtime_error("Even roots cannot contain a negative value");
             }
-            const double result = std::pow(std::fabs(value), 1.0 / index);
-            return value < 0.0 ? -result : result;
+            const double root = std::pow(std::fabs(argument.numeric), 1.0 / index.numeric);
+            if (!std::isfinite(root)) {
+                throw std::runtime_error("The result is not finite");
+            }
+            const double result = argument.numeric < 0.0 ? -root : root;
+            const bool exact = root == std::floor(root);
+            return {result, exact ? number_text(result)
+                                  : "root(" + index.exact + ")(" + argument.exact + ")", !exact};
         }
+        const bool is_log = match_word("log");
+        const bool is_ln = !is_log && match_word("ln");
+        if (is_log || is_ln) {
+            const std::string function = is_ln ? "ln" : "log";
+            const ParsedValue first_argument = parse_function_argument(function.c_str());
+            if (is_log) {
+                skip_whitespace();
+                if (input_[position_] == '(') {
+                    const ParsedValue argument = parse_function_argument("log");
+                    if (first_argument.numeric <= 0.0 || first_argument.numeric == 1.0 ||
+                        argument.numeric <= 0.0) {
+                        throw std::runtime_error("Logarithm base and value must be positive, and the base cannot be 1");
+                    }
+                    const double result = std::log(argument.numeric) /
+                                          std::log(first_argument.numeric);
+                    const bool exact = result == std::floor(result);
+                    return {result, exact ? number_text(result)
+                                          : "log(" + first_argument.exact + ")(" + argument.exact + ")", !exact};
+                }
+            }
+            const ParsedValue argument = first_argument;
+            if (argument.numeric <= 0.0) {
+                throw std::runtime_error("Logarithms require a positive value");
+            }
+            const double result = function == "ln" ? std::log(argument.numeric)
+                                                    : std::log10(argument.numeric);
+            const bool exact = result == std::floor(result);
+            return {result, exact ? number_text(result) : function + "(" + argument.exact + ")", !exact};
+        }
+        if (match_word("pi")) return {pi, "π", true};
+        if (match_word("e")) return {euler, "e", true};
 
         char* end = nullptr;
         const double value = std::strtod(input_ + position_, &end);
@@ -139,41 +224,39 @@ private:
             throw std::runtime_error("The number is not finite");
         }
         position_ = static_cast<std::size_t>(end - input_);
-        return value;
+        return {value, number_text(value), false};
     }
 
-    bool match_function(const char* name) {
-        skip_whitespace();
-        const std::size_t start = position_;
-        for (std::size_t index = 0; name[index] != '\0'; ++index) {
-            if (input_[position_] != name[index]) {
-                position_ = start;
-                return false;
-            }
-            ++position_;
-        }
-        if (std::isalnum(static_cast<unsigned char>(input_[position_])) ||
-            input_[position_] == '_') {
-            position_ = start;
-            return false;
-        }
-        return true;
-    }
-
-    double parse_function_argument(const char* function_name) {
+    ParsedValue parse_function_argument(const char* function) {
         skip_whitespace();
         if (input_[position_] != '(') {
-            throw std::runtime_error(std::string(function_name) +
-                                     " requires an expression in parentheses");
+            throw std::runtime_error(std::string(function) + " requires an expression in parentheses");
         }
         ++position_;
-        const double value = parse_expression();
+        ParsedValue value = parse_expression();
         skip_whitespace();
         if (input_[position_] != ')') {
             throw std::runtime_error("Missing closing parenthesis");
         }
         ++position_;
         return value;
+    }
+
+    bool match_word(const char* word) {
+        skip_whitespace();
+        const std::size_t start = position_;
+        for (std::size_t index = 0; word[index] != '\0'; ++index) {
+            if (input_[position_] != word[index]) {
+                position_ = start;
+                return false;
+            }
+            ++position_;
+        }
+        if (std::isalnum(static_cast<unsigned char>(input_[position_]))) {
+            position_ = start;
+            return false;
+        }
+        return true;
     }
 
     void skip_whitespace() {
@@ -201,13 +284,11 @@ extern "C" MathResult evaluate_expression(const char* expression) {
     if (expression == nullptr || expression[0] == '\0') {
         return failure("Enter an expression");
     }
-
     try {
+        const ParsedValue parsed = Parser(expression).parse();
         MathResult result{};
-        result.value = Parser(expression).parse();
-        if (!std::isfinite(result.value)) {
-            return failure("The result is not finite");
-        }
+        result.value = parsed.numeric;
+        std::strncpy(result.exact_value, parsed.exact.c_str(), sizeof(result.exact_value) - 1);
         return result;
     } catch (const std::exception& error) {
         return failure(error.what());

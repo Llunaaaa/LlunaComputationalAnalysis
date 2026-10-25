@@ -16,6 +16,12 @@ void assert_error(const char* expression, const char* message) {
     assert(std::strcmp(result.error_message, message) == 0);
 }
 
+void assert_exact(const char* expression, const char* expected) {
+    const MathResult result = evaluate_expression(expression);
+    assert(result.error_code == 0);
+    assert(std::strcmp(result.exact_value, expected) == 0);
+}
+
 int main() {
     assert_value("2 + 3 * 4", 14.0);
     assert_value("(2 + 3) * 4", 20.0);
@@ -27,6 +33,14 @@ int main() {
     assert_value("sqrt(16)", 4.0);
     assert_value("root(3)(27)", 3.0);
     assert_value("root(3)(-8)", -2.0);
+    assert_value("5!", 120.0);
+    assert_value("log(100)", 2.0);
+    assert_value("log(2)(8)", 3.0);
+    assert_value("ln(e)", 1.0);
+    assert_exact("pi", "π");
+    assert_exact("e", "e");
+    assert_exact("sqrt(2)", "sqrt(2)");
+    assert_exact("log(2)", "log(2)");
 
     assert_error("1 / 0", "Cannot divide by zero");
     assert_error("sqrt(-1)", "Cannot take the square root of a negative value");

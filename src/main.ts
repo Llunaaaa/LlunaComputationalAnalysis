@@ -8,7 +8,7 @@ const sections = [
   "Geometry", "Financial",
 ] as const;
 type Section = (typeof sections)[number];
-type Evaluation = { value: number | null; error: string | null };
+type Evaluation = { value: number | null; exact: string | null; error: string | null };
 type ExpressionRow = { id: number; expression: string; evaluation: Evaluation | null; evaluating: boolean };
 
 const app = document.querySelector<HTMLDivElement>("#app");
@@ -17,7 +17,7 @@ if (!app) throw new Error("Application root was not found");
 app.innerHTML = `
   <main class="app-shell">
     <aside class="sidebar" aria-label="Application sections">
-      <div class="sidebar-heading"><p class="eyebrow">LLUNA</p><h1>Computational Analysis</h1></div>
+      <div class="sidebar-heading"><p class="eyebrow logo-mark">LLUNA</p><h1>Computational Analysis</h1></div>
       <nav class="section-list">${sections.map((section) => `
         <button class="section-button" type="button" data-section="${section}">${section}</button>`).join("")}</nav>
     </aside>
@@ -26,10 +26,10 @@ app.innerHTML = `
     </section>
   </main>`;
 
-const pageContent = document.querySelector<HTMLDivElement>("#page-content");
+const pageElement = document.querySelector<HTMLDivElement>("#page-content");
 const sectionButtons = Array.from(document.querySelectorAll<HTMLButtonElement>(".section-button"));
-if (!pageContent || sectionButtons.length !== sections.length) throw new Error("Application navigation was not initialized");
-const page = pageContent;
+if (!pageElement || sectionButtons.length !== sections.length) throw new Error("Application navigation was not initialized");
+const page = pageElement;
 
 let nextRowId = 2;
 let rows: ExpressionRow[] = [{ id: 1, expression: "3^(2-6)", evaluation: null, evaluating: false }];
@@ -47,24 +47,20 @@ function renderPage(section: Section) {
 function renderArithmetic() {
   page.innerHTML = `
     <div class="arithmetic-page">
-      <p class="eyebrow">Arithmetic</p>
-      <h2>Expression workspace</h2>
-      <p class="page-description">Enter expressions using familiar ASCII-math notation. Press Enter to evaluate.</p>
+      <div class="arithmetic-heading"><p class="eyebrow">Arithmetic</p><h2>Arithmetic</h2>
+        <p class="page-description">A clean workspace for exact constants, roots, logarithms, and everyday calculations.</p></div>
       <div class="expression-list">${rows.map(renderRow).join("")}</div>
-      <button class="add-expression" type="button" id="add-expression">+ Add expression</button>
+      <button class="add-expression" type="button" id="add-expression"><span>+</span> Add expression</button>
+      <p class="syntax-note">Try <code>sqrt(2)</code>, <code>log(100)</code>, <code>pi</code>, <code>e</code>, or <code>5!</code></p>
     </div>`;
-  page.querySelector<HTMLButtonElement>("#add-expression")?.addEventListener("click", () => {
-    rows.push({ id: nextRowId++, expression: "", evaluation: null, evaluating: false });
-    renderArithmetic();
-    page.querySelector<HTMLInputElement>(`input[data-row-id="${rows[rows.length - 1].id}"]`)?.focus();
-  });
-  for (const input of page.querySelectorAll<HTMLInputElement>("input[data-row-id]")) {
-    input.addEventListener("input", () => {
-      const row = rows.find((item) => item.id === Number(input.dataset.rowId));
-      if (row) { row.expression = input.value; row.evaluation = null; renderRowResult(row); }
-    });
+  page.querySelector<HTMLButtonElement>("#add-expression")?.addEventListener("click", addRow);
+  for (const input of page.querySelectorAll<HTMLTextAreaElement>("[data-row-id]")) {
+    input.addEventListener("input", () => updateExpression(input));
     input.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") { event.preventDefault(); evaluateRow(Number(input.dataset.rowId)); }
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        evaluateRow(Number(input.dataset.rowId));
+      }
     });
   }
   for (const button of page.querySelectorAll<HTMLButtonElement>("[data-remove-row]")) {
@@ -80,39 +76,66 @@ function renderArithmetic() {
 
 function renderRow(row: ExpressionRow): string {
   const evaluation = row.evaluation;
-  const result = row.evaluating ? "Evaluating…" : evaluation?.error ? `Error: ${evaluation.error}` : evaluation ? `= ${formatValue(evaluation.value as number)}` : "Press Enter or Evaluate";
+  const result = row.evaluating ? "Evaluating…" : evaluation?.error
+    ? `Error: ${evaluation.error}`
+    : evaluation ? `${evaluation.exact ?? formatValue(evaluation.value as number)}${evaluation.exact && !isPlainNumber(evaluation.exact) ? `  ≈  ${formatValue(evaluation.value as number)}` : ""}` : "";
   return `<article class="expression-row">
-    <div class="expression-controls"><input data-row-id="${row.id}" value="${escapeAttribute(row.expression)}" placeholder="e.g. sqrt(2)" aria-label="Expression ${row.id}" />
-      <button class="evaluate-button" type="button" data-evaluate-row="${row.id}">Evaluate</button>
-      ${rows.length > 1 ? `<button class="remove-button" type="button" data-remove-row="${row.id}" aria-label="Remove expression ${row.id}">Remove</button>` : ""}</div>
-    <div class="math-preview" aria-label="Mathematical preview">${formatAsciiMath(row.expression) || "Your formatted expression will appear here"}</div>
-    <div class="expression-result ${evaluation?.error ? "has-error" : ""}">${result}</div>
+    <div class="expression-line">
+      <span class="line-number">${rows.indexOf(row) + 1}</span>
+      <div class="expression-editor">
+        <div class="math-display" aria-hidden="true">${formatAsciiMath(row.expression) || '<span class="editor-placeholder">Type an expression</span>'}</div>
+        <textarea data-row-id="${row.id}" rows="1" spellcheck="false" aria-label="Expression ${row.id}">${escapeHtml(row.expression)}</textarea>
+      </div>
+      <button class="row-action evaluate-row" type="button" data-evaluate-row="${row.id}" aria-label="Evaluate expression">↵</button>
+      ${rows.length > 1 ? `<button class="row-action remove-row" type="button" data-remove-row="${row.id}" aria-label="Remove expression">×</button>` : ""}
+    </div>
+    <div class="expression-result ${evaluation?.error ? "has-error" : ""}" data-result-row="${row.id}">${result}</div>
   </article>`;
 }
 
-function renderRowResult(row: ExpressionRow) {
-  const element = page.querySelector<HTMLElement>(`.expression-row:nth-child(${rows.indexOf(row) + 1})`);
-  if (!element) return;
-  element.querySelector<HTMLElement>(".math-preview")!.innerHTML = formatAsciiMath(row.expression) || "Your formatted expression will appear here";
-  element.querySelector<HTMLElement>(".expression-result")!.textContent = "Press Enter or Evaluate";
+function updateExpression(input: HTMLTextAreaElement) {
+  const row = rows.find((item) => item.id === Number(input.dataset.rowId));
+  if (!row) return;
+  row.expression = input.value;
+  row.evaluation = null;
+  const editor = input.closest(".expression-editor");
+  if (editor) editor.querySelector<HTMLElement>(".math-display")!.innerHTML =
+    formatAsciiMath(row.expression) || '<span class="editor-placeholder">Type an expression</span>';
+  page.querySelector<HTMLElement>(`[data-result-row="${row.id}"]`)!.textContent = "";
+}
+
+function addRow() {
+  rows.push({ id: nextRowId++, expression: "", evaluation: null, evaluating: false });
+  renderArithmetic();
+  page.querySelector<HTMLTextAreaElement>(`textarea[data-row-id="${rows[rows.length - 1].id}"]`)?.focus();
 }
 
 async function evaluateRow(id: number) {
   const row = rows.find((item) => item.id === id);
   if (!row) return;
-  if (!row.expression.trim()) { row.evaluation = { value: null, error: "Enter an expression" }; renderArithmetic(); return; }
-  row.evaluating = true; renderArithmetic();
+  if (!row.expression.trim()) {
+    row.evaluation = { value: null, exact: null, error: "Enter an expression" };
+    renderArithmetic();
+    return;
+  }
+  row.evaluating = true;
+  renderArithmetic();
   try {
     row.evaluation = await invoke<Evaluation>("evaluate", { expression: row.expression });
   } catch (error) {
-    row.evaluation = { value: null, error: error instanceof Error ? error.message : "Evaluation failed" };
-  } finally { row.evaluating = false; renderArithmetic(); }
+    row.evaluation = { value: null, exact: null, error: error instanceof Error ? error.message : "Evaluation failed" };
+  } finally {
+    row.evaluating = false;
+    renderArithmetic();
+  }
 }
 
-function formatValue(value: number): string {
-  return Number.isInteger(value) ? String(value) : `${value}`;
+function formatValue(value: number): string { return Number.isInteger(value) ? String(value) : `${value}`; }
+function isPlainNumber(value: string): boolean { return /^-?(?:\d+\.?\d*|\.\d+)$/.test(value); }
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (character) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character] ?? character);
 }
-function escapeAttribute(value: string): string { return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;"); }
 
 for (const button of sectionButtons) {
   button.addEventListener("click", () => {

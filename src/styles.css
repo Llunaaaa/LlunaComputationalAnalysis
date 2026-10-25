@@ -12,6 +12,12 @@
   --light-gray: #c6ccc2;
   --white: #f4f4f0;
   --lime: #a7e635;
+  --line: #292b2a;
+  --panel: #0d0e0d;
+}
+
+.sidebar-heading .logo-mark {
+  color: var(--lime);
 }
 
 * {
@@ -55,7 +61,7 @@ button {
 
 .eyebrow {
   margin: 0;
-  color: var(--lime);
+  color: #9a9e9a;
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.14em;
@@ -95,7 +101,7 @@ h1 {
 }
 
 .section-button.active {
-  background: var(--active);
+  background: #292b2a;
   color: var(--white);
 }
 
@@ -129,7 +135,7 @@ h1 {
   flex: 1;
   align-items: flex-start;
   justify-content: center;
-  padding-top: clamp(110px, 20vh, 220px);
+  padding-top: 72px;
 }
 
 .empty-page {
@@ -145,82 +151,136 @@ h1 {
 }
 
 .arithmetic-page {
-  width: min(900px, 100%);
+  width: min(980px, 100%);
+}
+
+.arithmetic-heading {
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 12px;
+  padding-bottom: 24px;
 }
 
 .arithmetic-page h2 {
-  margin: 12px 0 8px;
+  margin: 8px 0 6px;
   color: var(--white);
-  font-size: clamp(2rem, 5vw, 3.5rem);
-  letter-spacing: -0.05em;
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  font-weight: 500;
+  letter-spacing: -0.04em;
 }
 
 .page-description {
-  max-width: 620px;
-  margin: 0 0 28px;
+  max-width: 680px;
+  margin: 0;
   color: var(--gray);
   line-height: 1.5;
 }
 
 .expression-list {
   display: grid;
-  gap: 14px;
+  gap: 0;
 }
 
 .expression-row {
-  border-left: 2px solid #303530;
-  padding: 4px 0 12px 16px;
+  border-bottom: 1px solid var(--line);
+  padding: 8px 0 12px;
 }
 
-.expression-controls {
+.expression-line {
   display: flex;
+  align-items: center;
   gap: 8px;
 }
 
-.expression-controls input {
-  min-width: 0;
+.line-number {
+  width: 28px;
+  color: #626762;
+  font: 0.78rem "Cascadia Mono", Consolas, monospace;
+  text-align: right;
+}
+
+.expression-editor {
+  position: relative;
+  min-height: 48px;
   flex: 1;
-  border: 1px solid #3a403a;
-  border-radius: 8px;
-  background: #0b0c0b;
+  overflow: hidden;
+}
+
+.math-display,
+.expression-editor textarea {
+  width: 100%;
+  min-height: 48px;
+  margin: 0;
+  border: 0;
+  padding: 9px 12px;
+  font-family: "Cambria Math", "Times New Roman", serif;
+  font-size: 1.65rem;
+  line-height: 1.3;
+}
+
+.math-display {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
   color: var(--white);
-  font: 1rem "Cascadia Mono", Consolas, monospace;
-  padding: 11px 12px;
+  pointer-events: none;
+  white-space: pre-wrap;
 }
 
-.expression-controls input:focus {
-  outline: 2px solid var(--lime);
-  outline-offset: 1px;
+.expression-editor textarea {
+  position: relative;
+  display: block;
+  resize: none;
+  overflow: hidden;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--white);
+  font-family: "Cascadia Mono", Consolas, monospace;
+  outline: 0;
 }
 
-.evaluate-button,
-.remove-button,
+.expression-editor:focus-within {
+  background: #171917;
+  box-shadow: inset 2px 0 #777b77;
+}
+
+.editor-placeholder {
+  color: #575b57;
+  font-size: 1.1rem;
+}
+
 .add-expression {
-  border: 1px solid #3a403a;
-  border-radius: 8px;
-  background: #171a17;
+  border: 1px solid #4a4e4a;
+  border-radius: 5px;
+  background: transparent;
   color: var(--light-gray);
   cursor: pointer;
-  padding: 0 13px;
+  margin: 18px 0 0 36px;
+  padding: 9px 14px;
 }
 
-.evaluate-button:hover,
-.remove-button:hover,
 .add-expression:hover {
   background: var(--hover);
   color: var(--white);
 }
 
-.remove-button {
-  color: #a99b9b;
+.row-action {
+  width: 28px;
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: #777c77;
+  cursor: pointer;
+  font-size: 1.1rem;
 }
 
-.math-preview {
-  min-height: 28px;
-  margin-top: 12px;
-  color: var(--light-gray);
-  font-family: "Cambria Math", "Times New Roman", serif;
-  font-size: 1.25rem;
+.row-action:hover {
+  border-color: #4a4e4a;
+  color: var(--white);
+}
+
+.remove-row {
+  color: #9a8181;
 }
 
 .math-power sup,
@@ -234,7 +294,7 @@ h1 {
 }
 
 .math-root > span {
-  border-top: 1px solid var(--light-gray);
+  border-top: 1px solid var(--white);
   padding: 1px 3px 0;
 }
 
@@ -256,19 +316,25 @@ h1 {
 }
 
 .expression-result {
-  margin-top: 8px;
-  color: var(--lime);
+  min-height: 20px;
+  margin: 2px 0 0 36px;
+  color: #d7dbd6;
   font-family: "Cascadia Mono", Consolas, monospace;
   font-size: 0.9rem;
 }
 
 .expression-result.has-error {
-  color: #d49393;
+  color: #c99090;
 }
 
-.add-expression {
-  margin-top: 20px;
-  padding: 10px 14px;
+.syntax-note {
+  margin: 18px 0 0 36px;
+  color: #626762;
+  font-size: 0.82rem;
+}
+
+.syntax-note code {
+  color: #aeb4ad;
 }
 
 @media (max-width: 720px) {
@@ -304,16 +370,17 @@ h1 {
     padding-top: 80px;
   }
 
-  .expression-controls {
+  .expression-line {
     flex-wrap: wrap;
   }
 
-  .expression-controls input {
-    flex-basis: 100%;
+  .expression-editor {
+    min-width: calc(100% - 72px);
   }
 
-  .evaluate-button,
-  .remove-button {
-    min-height: 38px;
+  .expression-result,
+  .add-expression,
+  .syntax-note {
+    margin-left: 36px;
   }
 }

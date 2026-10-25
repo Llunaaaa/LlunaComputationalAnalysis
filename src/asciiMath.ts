@@ -1,4 +1,4 @@
-const tokenPattern = /(\d+(?:\.\d+)?|\.\d+|[A-Za-z]+|[()+\-*/^])/g;
+const tokenPattern = /(\d+(?:\.\d+)?|\.\d+|[A-Za-z]+|[()+\-*/^!])/g;
 
 function escapeHtml(value: string): string {
   return value.replace(
@@ -24,11 +24,18 @@ export function formatAsciiMath(expression: string): string {
   const output: string[] = [];
   for (let index = 0; index < tokens.length; index += 1) {
     const token = tokens[index];
-    if (token === "sqrt" && tokens[index + 1] === "(") {
+    if ((token === "sqrt" || token === "log" || token === "ln") && tokens[index + 1] === "(") {
+      if (token !== "sqrt") {
+        output.push(`<span class="math-function">${escapeHtml(token)}<span>${formatAsciiMath(
+          collectParenthesized(tokens, index + 1),
+        )}</span></span>`);
+        index = findClosingParenthesis(tokens, index + 1);
+      } else {
       output.push(`<span class="math-root">√<span>${formatAsciiMath(
         collectParenthesized(tokens, index + 1),
       )}</span></span>`);
       index = findClosingParenthesis(tokens, index + 1);
+      }
     } else if (token === "root" && tokens[index + 1] === "(") {
       const indexEnd = findClosingParenthesis(tokens, index + 1);
       if (tokens[indexEnd + 1] === "(") {
@@ -48,6 +55,10 @@ export function formatAsciiMath(expression: string): string {
         output.length - 1
       ]}<sup>${escapeHtml(tokens[index + 1])}</sup></span>`;
       index += 1;
+    } else if (token === "!" && output.length > 0) {
+      output[output.length - 1] += "!";
+    } else if (token === "pi") {
+      output.push("π");
     } else if (token === "/" && index > 0 && index + 1 < tokens.length) {
       output[output.length - 1] = `<span class="math-fraction"><span>${output[
         output.length - 1

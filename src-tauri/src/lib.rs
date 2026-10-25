@@ -5,6 +5,7 @@ struct NativeMathResult {
     error_code: i32,
     value: f64,
     error_message: [u8; 256],
+    exact_value: [u8; 256],
 }
 
 unsafe extern "C" {
@@ -14,6 +15,7 @@ unsafe extern "C" {
 #[derive(Debug, Serialize)]
 struct Evaluation {
     value: Option<f64>,
+    exact: Option<String>,
     error: Option<String>,
 }
 
@@ -26,6 +28,7 @@ fn evaluate(expression: String) -> Result<Evaluation, String> {
     if result.error_code == 0 {
         return Ok(Evaluation {
             value: Some(result.value),
+            exact: read_message(&result.exact_value),
             error: None,
         });
     }
@@ -38,8 +41,21 @@ fn evaluate(expression: String) -> Result<Evaluation, String> {
     let message = String::from_utf8_lossy(&result.error_message[..message_length]).into_owned();
     Ok(Evaluation {
         value: None,
+        exact: None,
         error: Some(message),
     })
+}
+
+fn read_message(message: &[u8]) -> Option<String> {
+    let length = message
+        .iter()
+        .position(|character| *character == 0)
+        .unwrap_or(message.len());
+    if length == 0 {
+        None
+    } else {
+        Some(String::from_utf8_lossy(&message[..length]).into_owned())
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
