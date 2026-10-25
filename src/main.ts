@@ -32,7 +32,7 @@ if (!pageElement || sectionButtons.length !== sections.length) throw new Error("
 const page = pageElement;
 
 let nextRowId = 2;
-let rows: ExpressionRow[] = [{ id: 1, expression: "3^(2-6)", evaluation: null, evaluating: false }];
+let rows: ExpressionRow[] = [{ id: 1, expression: "", evaluation: null, evaluating: false }];
 
 function renderPage(section: Section) {
   if (section === "Arithmetic") renderArithmetic();
@@ -44,11 +44,9 @@ function renderPage(section: Section) {
   }
 }
 
-function renderArithmetic() {
+function renderArithmetic(focusId?: number, caretPosition?: number) {
   page.innerHTML = `
     <div class="arithmetic-page">
-      <div class="arithmetic-heading"><p class="eyebrow">Arithmetic</p><h2>Arithmetic</h2>
-        <p class="page-description">A clean workspace for exact constants, roots, logarithms, and everyday calculations.</p></div>
       <div class="expression-list">${rows.map(renderRow).join("")}</div>
       <button class="add-expression" type="button" id="add-expression"><span>+</span> Add expression</button>
       <p class="syntax-note">Try <code>sqrt(2)</code>, <code>log(100)</code>, <code>pi</code>, <code>e</code>, or <code>5!</code></p>
@@ -66,11 +64,15 @@ function renderArithmetic() {
   for (const button of page.querySelectorAll<HTMLButtonElement>("[data-remove-row]")) {
     button.addEventListener("click", () => {
       rows = rows.filter((row) => row.id !== Number(button.dataset.removeRow));
+      ensureTrailingBlank();
       renderArithmetic();
     });
   }
   for (const button of page.querySelectorAll<HTMLButtonElement>("[data-evaluate-row]")) {
     button.addEventListener("click", () => evaluateRow(Number(button.dataset.evaluateRow)));
+  }
+  if (focusId !== undefined) {
+    requestAnimationFrame(() => focusEditor(focusId, caretPosition));
   }
 }
 
@@ -86,7 +88,6 @@ function renderRow(row: ExpressionRow): string {
         <div class="math-display" aria-hidden="true">${formatAsciiMath(row.expression) || '<span class="editor-placeholder">Type an expression</span>'}</div>
         <textarea data-row-id="${row.id}" rows="1" spellcheck="false" aria-label="Expression ${row.id}">${escapeHtml(row.expression)}</textarea>
       </div>
-      <button class="row-action evaluate-row" type="button" data-evaluate-row="${row.id}" aria-label="Evaluate expression">↵</button>
       ${rows.length > 1 ? `<button class="row-action remove-row" type="button" data-remove-row="${row.id}" aria-label="Remove expression">×</button>` : ""}
     </div>
     <div class="expression-result ${evaluation?.error ? "has-error" : ""}" data-result-row="${row.id}">${result}</div>
@@ -102,31 +103,54 @@ function updateExpression(input: HTMLTextAreaElement) {
   if (editor) editor.querySelector<HTMLElement>(".math-display")!.innerHTML =
     formatAsciiMath(row.expression) || '<span class="editor-placeholder">Type an expression</span>';
   page.querySelector<HTMLElement>(`[data-result-row="${row.id}"]`)!.textContent = "";
+  if (row.id === rows[rows.length - 1].id && row.expression.trim()) {
+    const caretPosition = input.selectionStart;
+    rows.push({ id: nextRowId++, expression: "", evaluation: null, evaluating: false });
+    renderArithmetic(row.id, caretPosition);
+  }
 }
 
 function addRow() {
-  rows.push({ id: nextRowId++, expression: "", evaluation: null, evaluating: false });
-  renderArithmetic();
-  page.querySelector<HTMLTextAreaElement>(`textarea[data-row-id="${rows[rows.length - 1].id}"]`)?.focus();
+  const newRowId = nextRowId++;
+  rows.push({ id: newRowId, expression: "", evaluation: null, evaluating: false });
+  renderArithmetic(newRowId, 0);
+  page.querySelector<HTMLTextAreaElement>(`textarea[data-row-id="${newRowId}"]`)?.focus();
+}
+
+function ensureTrailingBlank() {
+  if (!rows.length || rows[rows.length - 1].expression.trim()) {
+    rows.push({ id: nextRowId++, expression: "", evaluation: null, evaluating: false });
+  }
+}
+
+function focusEditor(id: number, caretPosition = 0) {
+  const input = page.querySelector<HTMLTextAreaElement>(`textarea[data-row-id="${id}"]`);
+  if (input) {
+    input.focus();
+    input.setSelectionRange(caretPosition, caretPosition);
+  }
 }
 
 async function evaluateRow(id: number) {
   const row = rows.find((item) => item.id === id);
   if (!row) return;
+  const input = page.querySelector<HTMLTextAreaElement>(`textarea[data-row-id="${id}"]`);
+  const caretPosition = input?.selectionStart ?? row.expression.length;
   if (!row.expression.trim()) {
     row.evaluation = { value: null, exact: null, error: "Enter an expression" };
-    renderArithmetic();
+    renderArithmetic(id, caretPosition);
     return;
   }
   row.evaluating = true;
-  renderArithmetic();
+  renderArithmetic(id, caretPosition);
   try {
     row.evaluation = await invoke<Evaluation>("evaluate", { expression: row.expression });
   } catch (error) {
     row.evaluation = { value: null, exact: null, error: error instanceof Error ? error.message : "Evaluation failed" };
   } finally {
     row.evaluating = false;
-    renderArithmetic();
+    ensureTrailingBlank();
+    renderArithmetic(id, caretPosition);
   }
 }
 
