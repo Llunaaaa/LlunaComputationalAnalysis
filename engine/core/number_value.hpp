@@ -130,6 +130,11 @@ inline NumberValue subtract(const NumberValue& a, const NumberValue& b) {
 }
 
 inline NumberValue multiply(const NumberValue& a, const NumberValue& b) {
+    if (a.mantissa == 0.0 || b.mantissa == 0.0) return NumberValue(0.0, false);
+    if ((b.exponent > 0 && a.exponent > std::numeric_limits<long long>::max() - b.exponent) ||
+        (b.exponent < 0 && a.exponent < std::numeric_limits<long long>::min() - b.exponent)) {
+        throw std::runtime_error("Operation requires an unreasonable amount of computational power");
+    }
     double new_man = a.mantissa * b.mantissa;
     long long new_exp = a.exponent + b.exponent;
     return NumberValue::from_scientific(new_man, new_exp, a.is_approximate || b.is_approximate);
@@ -138,6 +143,10 @@ inline NumberValue multiply(const NumberValue& a, const NumberValue& b) {
 inline NumberValue divide(const NumberValue& a, const NumberValue& b) {
     if (b.mantissa == 0.0) {
         throw std::runtime_error("Cannot divide by zero");
+    }
+    if ((b.exponent < 0 && a.exponent > std::numeric_limits<long long>::max() + b.exponent) ||
+        (b.exponent > 0 && a.exponent < std::numeric_limits<long long>::min() + b.exponent)) {
+        throw std::runtime_error("Operation requires an unreasonable amount of computational power");
     }
     double new_man = a.mantissa / b.mantissa;
     long long new_exp = a.exponent - b.exponent;
@@ -173,11 +182,17 @@ inline NumberValue power(const NumberValue& a, const NumberValue& b) {
         }
         return res;
     }
+    // Protective limit against massive chained exponentiation (e.g. 9^(100000!))
+    if (b.exponent > 18 || b.exponent < -18) {
+        throw std::runtime_error("Operation requires an unreasonable amount of computational power");
+    }
     double log10_a = std::log10(a.mantissa) + static_cast<double>(a.exponent);
     double b_val = b.to_double();
     double total_log = b_val * log10_a;
-    if (!std::isfinite(total_log)) {
-        throw std::runtime_error("The result is not finite");
+    if (!std::isfinite(total_log) ||
+        total_log > static_cast<double>(std::numeric_limits<long long>::max()) - 1000.0 ||
+        total_log < static_cast<double>(std::numeric_limits<long long>::min()) + 1000.0) {
+        throw std::runtime_error("Operation requires an unreasonable amount of computational power");
     }
     long long new_exp = static_cast<long long>(std::floor(total_log));
     double rem_exp = total_log - static_cast<double>(new_exp);

@@ -52,6 +52,14 @@ int main() {
     assert_display_prefix("171!", "1.241018");
     assert_display_prefix("200!", "7.886578");
     assert_display_prefix("1000!", "4.023872");
+    assert_display_prefix("100000!", "2.824229");
+    assert_approximate("100000!", 0);
+    assert_display_prefix("100001!", "2.82425");
+    assert_approximate("100001!", 1);
+    assert_display_prefix("1000000!", "8.26393");
+    assert_approximate("1000000!", 1);
+    assert_error("9^(100000!)", "Operation requires an unreasonable amount of computational power");
+    assert_error("(100000!)!", "Operation requires an unreasonable amount of computational power");
     assert_error("9.5!", "Factorial of a non-integer requires the gamma function");
     assert_error("(-3)!", "Cannot take factorial of a negative value");
     assert_value("2sqrt(2)", 2.0 * std::sqrt(2.0));

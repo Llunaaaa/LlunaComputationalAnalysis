@@ -96,6 +96,22 @@ mod tests {
     }
 
     #[test]
+    fn evaluates_stirling_factorial_beyond_100000() {
+        let result = evaluate("100001!".to_owned()).expect("evaluation should succeed");
+        assert!(result.display_value.is_some());
+        assert!(result.display_value.unwrap().starts_with("2.82425"));
+        assert_eq!(result.is_approximate, true);
+        assert_eq!(result.error, None);
+    }
+
+    #[test]
+    fn guards_against_unreasonable_computation() {
+        let result = evaluate("9^(100000!)".to_owned()).expect("command should return an evaluation");
+        assert_eq!(result.value, None);
+        assert_eq!(result.error.as_deref(), Some("Operation requires an unreasonable amount of computational power"));
+    }
+
+    #[test]
     fn reports_native_engine_errors() {
         let result = evaluate("1 / 0".to_owned()).expect("command should return an evaluation");
         assert_eq!(result.value, None);

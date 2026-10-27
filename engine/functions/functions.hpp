@@ -1,9 +1,11 @@
 #pragma once
 
 #include "../core/number_value.hpp"
+#include "../constants/constants.hpp"
 #include <cmath>
 #include <string>
 #include <stdexcept>
+#include <limits>
 
 namespace lluna::functions {
 
@@ -98,31 +100,66 @@ inline core::NumberValue eval_factorial(const core::NumberValue& arg) {
     if (!arg.is_integer()) {
         throw std::runtime_error("Factorial of a non-integer requires the gamma function");
     }
-    double d = arg.to_double();
-    if (d > 100000.0) {
-        throw std::runtime_error("Factorial exceeds calculation limit (max 100,000)");
+
+    // Computational Guardrail: upper bound of 1e18 (1 quintillion) to prevent
+    // system freeze and exponent tracking overflow
+    if (arg.exponent > 18 || (arg.exponent == 18 && std::fabs(arg.mantissa) > 1.0) || arg.to_double() > 1e18) {
+        throw std::runtime_error("Operation requires an unreasonable amount of computational power");
     }
+
+    double d = arg.to_double();
     long long n = static_cast<long long>(d);
     if (n <= 1) {
         return core::NumberValue(1.0, false);
     }
-    if (n <= 170) {
-        double fact = 1.0;
-        for (long long i = 2; i <= n; ++i) {
-            fact *= static_cast<double>(i);
+
+    // Requirement 1: For n <= 100000, keep loop-based logic for maximum double-precision accuracy
+    if (n <= 100000) {
+        if (n <= 170) {
+            double fact = 1.0;
+            for (long long i = 2; i <= n; ++i) {
+                fact *= static_cast<double>(i);
+            }
+            return core::NumberValue(fact, false);
         }
-        return core::NumberValue(fact, false);
+
+        double mantissa = 1.0;
+        long long exponent = 0;
+        for (long long i = 2; i <= n; ++i) {
+            mantissa *= static_cast<double>(i);
+            while (mantissa >= 1e12) {
+                mantissa /= 1e12;
+                exponent += 12;
+            }
+        }
+        while (mantissa >= 10.0) {
+            mantissa /= 10.0;
+            exponent += 1;
+        }
+        while (mantissa < 1.0 && mantissa > 0.0) {
+            mantissa *= 10.0;
+            exponent -= 1;
+        }
+        return core::NumberValue::from_scientific(mantissa, exponent, false);
     }
 
-    double mantissa = 1.0;
-    long long exponent = 0;
-    for (long long i = 2; i <= n; ++i) {
-        mantissa *= static_cast<double>(i);
-        while (mantissa >= 1e12) {
-            mantissa /= 1e12;
-            exponent += 12;
-        }
+    // Requirement 2: For n > 100000, use log10-based Stirling's Approximation:
+    // log10(n!) ≈ 0.5 * log10(2 * pi * n) + n * (log10(n) - log10(e))
+    double pi_val = constants::compute_pi();
+    double log10_2pi = std::log10(2.0 * pi_val);
+    double log10_e = std::log10(constants::compute_euler());
+    double log10_n = std::log10(static_cast<double>(n));
+    double log10_fact = 0.5 * (log10_2pi + log10_n) + static_cast<double>(n) * (log10_n - log10_e);
+
+    if (!std::isfinite(log10_fact) ||
+        log10_fact >= static_cast<double>(std::numeric_limits<long long>::max()) - 1000.0) {
+        throw std::runtime_error("Operation requires an unreasonable amount of computational power");
     }
+
+    long long exponent = static_cast<long long>(std::floor(log10_fact));
+    double rem = log10_fact - static_cast<double>(exponent);
+    double mantissa = std::pow(10.0, rem);
+
     while (mantissa >= 10.0) {
         mantissa /= 10.0;
         exponent += 1;
@@ -131,7 +168,8 @@ inline core::NumberValue eval_factorial(const core::NumberValue& arg) {
         mantissa *= 10.0;
         exponent -= 1;
     }
-    return core::NumberValue::from_scientific(mantissa, exponent, false);
+
+    return core::NumberValue::from_scientific(mantissa, exponent, true);
 }
 
 inline bool is_function_name(const std::string& name) {
