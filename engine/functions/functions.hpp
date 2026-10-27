@@ -92,44 +92,80 @@ inline core::NumberValue eval_ln(const core::NumberValue& arg) {
 }
 
 inline core::NumberValue eval_factorial(const core::NumberValue& arg) {
-    if (arg.is_negative()) {
-        throw std::runtime_error("Cannot take factorial of a negative value");
-    }
-    if (!arg.is_integer()) {
-        throw std::runtime_error("Factorial of a non-integer requires the gamma function");
+    // 1. Negative integers are undefined in mathematics (poles of the Gamma function)
+    if (arg.is_negative() && arg.is_integer()) {
+        throw std::runtime_error("Factorial is undefined for negative integers");
     }
 
-    // Computational Guardrail: upper bound of 1e18 (1 quintillion) to prevent
+    // 2. Computational Guardrail: upper bound of 1e18 (1 quintillion) to prevent
     // system freeze and exponent tracking overflow
-    if (arg.exponent() > 18 || (arg.exponent() == 18 && std::fabs(arg.mantissa()) > 1.0) || arg.to_double() > 1e18) {
+    if (arg.exponent() > 18 || (arg.exponent() == 18 && std::fabs(arg.mantissa()) > 1.0) || std::fabs(arg.to_double()) > 1e18) {
         throw std::runtime_error("Operation requires an unreasonable amount of computational power");
     }
 
-    double d = arg.to_double();
-    long long n = static_cast<long long>(d);
-    if (n <= 1) {
-        return core::NumberValue(1.0, false);
-    }
-
-    // Requirement 1: For n <= 100000, keep loop-based logic for maximum double-precision accuracy
-    if (n <= 100000) {
-        if (n <= 170) {
+    // 3. Non-negative integers
+    if (arg.is_integer() && !arg.is_negative()) {
+        double d = arg.to_double();
+        long long n = static_cast<long long>(std::round(d));
+        if (n <= 1) {
+            return core::NumberValue(1.0, false);
+        }
+        // Exact integers in IEEE-754 double (up to 18! = 6.4e15 < 2^53)
+        if (n <= 18) {
             double fact = 1.0;
             for (long long i = 2; i <= n; ++i) {
                 fact *= static_cast<double>(i);
             }
             return core::NumberValue(fact, false);
         }
-
-        double mantissa = 1.0;
-        long long exponent = 0;
-        for (long long i = 2; i <= n; ++i) {
-            mantissa *= static_cast<double>(i);
-            while (mantissa >= 1e12) {
-                mantissa /= 1e12;
-                exponent += 12;
+        if (n <= 170) {
+            double fact = 1.0;
+            for (long long i = 2; i <= n; ++i) {
+                fact *= static_cast<double>(i);
             }
+            // For n > 18, double precision rounds lower bits, so it's an approximation
+            return core::NumberValue(fact, true);
         }
+
+        // Loop-based logic up to 100,000 for maximum accuracy
+        if (n <= 100000) {
+            double mantissa = 1.0;
+            long long exponent = 0;
+            for (long long i = 2; i <= n; ++i) {
+                mantissa *= static_cast<double>(i);
+                while (mantissa >= 1e12) {
+                    mantissa /= 1e12;
+                    exponent += 12;
+                }
+            }
+            while (mantissa >= 10.0) {
+                mantissa /= 10.0;
+                exponent += 1;
+            }
+            while (mantissa < 1.0 && mantissa > 0.0) {
+                mantissa *= 10.0;
+                exponent -= 1;
+            }
+            return core::NumberValue::from_scientific(mantissa, exponent, true);
+        }
+
+        // For n > 100,000: Stirling's approximation with Ramanujan 1/(12n) correction
+        double pi_val = constants::compute_pi();
+        double log10_2pi = std::log10(2.0 * pi_val);
+        double log10_e = std::log10(constants::compute_euler());
+        double log10_n = std::log10(static_cast<double>(n));
+        double log10_fact = 0.5 * (log10_2pi + log10_n) + static_cast<double>(n) * (log10_n - log10_e)
+                           + (1.0 / (12.0 * static_cast<double>(n))) * log10_e;
+
+        if (!std::isfinite(log10_fact) ||
+            log10_fact >= static_cast<double>(std::numeric_limits<long long>::max()) - 1000.0) {
+            throw std::runtime_error("Operation requires an unreasonable amount of computational power");
+        }
+
+        long long exponent = static_cast<long long>(std::floor(log10_fact));
+        double rem = log10_fact - static_cast<double>(exponent);
+        double mantissa = std::pow(10.0, rem);
+
         while (mantissa >= 10.0) {
             mantissa /= 10.0;
             exponent += 1;
@@ -138,31 +174,77 @@ inline core::NumberValue eval_factorial(const core::NumberValue& arg) {
             mantissa *= 10.0;
             exponent -= 1;
         }
-        return core::NumberValue::from_scientific(mantissa, exponent, false);
+
+        return core::NumberValue::from_scientific(mantissa, exponent, true);
     }
 
-    // Requirement 2: For n > 100000, use log10-based Stirling's Approximation:
-    // log10(n!) ≈ 0.5 * log10(2 * pi * n) + n * (log10(n) - log10(e))
+    // 4. Non-integers (both positive and negative):
+    // Standard mathematical extension via Euler's Gamma function: x! = Gamma(x + 1)
+    double x = arg.to_double();
+    if (std::fabs(x) <= 170.0) {
+        double val = std::tgamma(x + 1.0);
+        if (!std::isfinite(val)) {
+            throw std::runtime_error("The result is not finite");
+        }
+        return core::NumberValue(val, true);
+    }
+
+    // For large non-integers |x| > 170:
+    if (x > 170.0) {
+        double pi_val = constants::compute_pi();
+        double log10_2pi = std::log10(2.0 * pi_val);
+        double log10_e = std::log10(constants::compute_euler());
+        double log10_x = std::log10(x);
+        double log10_fact = 0.5 * (log10_2pi + log10_x) + x * (log10_x - log10_e)
+                           + (1.0 / (12.0 * x)) * log10_e;
+
+        if (!std::isfinite(log10_fact) ||
+            log10_fact >= static_cast<double>(std::numeric_limits<long long>::max()) - 1000.0) {
+            throw std::runtime_error("Operation requires an unreasonable amount of computational power");
+        }
+
+        long long exponent = static_cast<long long>(std::floor(log10_fact));
+        double rem = log10_fact - static_cast<double>(exponent);
+        double mantissa = std::pow(10.0, rem);
+
+        while (mantissa >= 10.0) {
+            mantissa /= 10.0;
+            exponent += 1;
+        }
+        while (mantissa < 1.0 && mantissa > 0.0) {
+            mantissa *= 10.0;
+            exponent -= 1;
+        }
+
+        return core::NumberValue::from_scientific(mantissa, exponent, true);
+    }
+
+    // For negative non-integers x < -170:
+    // Euler's reflection formula: Gamma(x + 1) = pi / (sin(pi * (x + 1)) * Gamma(-x))
     double pi_val = constants::compute_pi();
+    double pos_arg = -x;
     double log10_2pi = std::log10(2.0 * pi_val);
     double log10_e = std::log10(constants::compute_euler());
-    double log10_n = std::log10(static_cast<double>(n));
-    double log10_fact = 0.5 * (log10_2pi + log10_n) + static_cast<double>(n) * (log10_n - log10_e);
+    double log10_pos = std::log10(pos_arg);
+    double log10_gamma_pos = 0.5 * (log10_2pi + log10_pos) + pos_arg * (log10_pos - log10_e)
+                           + (1.0 / (12.0 * pos_arg)) * log10_e;
 
-    if (!std::isfinite(log10_fact) ||
-        log10_fact >= static_cast<double>(std::numeric_limits<long long>::max()) - 1000.0) {
-        throw std::runtime_error("Operation requires an unreasonable amount of computational power");
+    double sin_val = std::sin(pi_val * (x + 1.0));
+    if (sin_val == 0.0) {
+        throw std::runtime_error("Factorial is undefined for negative integers");
     }
+    double sign = sin_val < 0.0 ? -1.0 : 1.0;
+    double log10_fact = std::log10(pi_val) - std::log10(std::fabs(sin_val)) - log10_gamma_pos;
 
     long long exponent = static_cast<long long>(std::floor(log10_fact));
     double rem = log10_fact - static_cast<double>(exponent);
-    double mantissa = std::pow(10.0, rem);
+    double mantissa = sign * std::pow(10.0, rem);
 
-    while (mantissa >= 10.0) {
+    while (std::fabs(mantissa) >= 10.0) {
         mantissa /= 10.0;
         exponent += 1;
     }
-    while (mantissa < 1.0 && mantissa > 0.0) {
+    while (std::fabs(mantissa) < 1.0 && mantissa != 0.0) {
         mantissa *= 10.0;
         exponent -= 1;
     }

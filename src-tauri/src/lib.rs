@@ -105,6 +105,20 @@ mod tests {
     }
 
     #[test]
+    fn evaluates_gamma_factorials() {
+        let r1 = evaluate("9.5!".to_owned()).expect("evaluation should succeed");
+        assert!(r1.display_value.unwrap().starts_with("1133278"));
+        assert_eq!(r1.is_approximate, true);
+
+        let r2 = evaluate("(-0.5)!".to_owned()).expect("evaluation should succeed");
+        assert!(r2.display_value.unwrap().starts_with("1.77245"));
+        assert_eq!(r2.is_approximate, true);
+
+        let r3 = evaluate("(-9)!".to_owned()).expect("evaluation should succeed");
+        assert_eq!(r3.error.as_deref(), Some("Factorial is undefined for negative integers"));
+    }
+
+    #[test]
     fn guards_against_unreasonable_computation() {
         let result = evaluate("9^(100000!)".to_owned()).expect("command should return an evaluation");
         assert_eq!(result.value, None);
