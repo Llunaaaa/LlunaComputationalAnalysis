@@ -99,6 +99,8 @@ int main() {
     assert_approximate("2pi / pi", 0);
     assert_value("pi - pi", 0.0);
     assert_approximate("pi - pi", 0);
+    assert_value("(1 / pi) * pi", 1.0);
+    assert_approximate("(1 / pi) * pi", 0);
     assert_value("e / e", 1.0);
     assert_approximate("e / e", 0);
     assert_value("e - e", 0.0);
@@ -109,8 +111,28 @@ int main() {
     assert_approximate("sqrt(2) * sqrt(2)", 0);
     assert_value("sqrt(2) / sqrt(2)", 1.0);
     assert_approximate("sqrt(2) / sqrt(2)", 0);
+    assert_value("(1 / sqrt(2)) * sqrt(2)", 1.0);
+    assert_approximate("(1 / sqrt(2)) * sqrt(2)", 0);
     assert_value("2sqrt(2) / sqrt(2)", 2.0);
     assert_approximate("2sqrt(2) / sqrt(2)", 0);
+
+    // General radical integer powers (Fallacy 1 resolution)
+    assert_value("(sqrt(2))^2", 2.0);
+    assert_approximate("(sqrt(2))^2", 0);
+    assert_value("(sqrt(2))^4", 4.0);
+    assert_approximate("(sqrt(2))^4", 0);
+    assert_value("(2sqrt(2))^2", 8.0);
+    assert_approximate("(2sqrt(2))^2", 0);
+    assert_value("(2sqrt(2))^4", 64.0);
+    assert_approximate("(2sqrt(2))^4", 0);
+
+    // Reciprocal integer logarithms (Fallacy 5 resolution)
+    assert_value("log(2)(1/8)", -3.0);
+    assert_approximate("log(2)(1/8)", 0);
+    assert_value("log(1/2)(8)", -3.0);
+    assert_approximate("log(1/2)(8)", 0);
+    assert_value("log(1/2)(1/8)", 3.0);
+    assert_approximate("log(1/2)(1/8)", 0);
 
     assert_approximate("sqrt(2)", 1);
     assert_approximate("sqrt(16)", 0);

@@ -117,6 +117,18 @@ mod tests {
         let r3 = evaluate("sqrt(2) * sqrt(2)".to_owned()).expect("evaluation should succeed");
         assert_eq!(r3.value, Some(2.0));
         assert_eq!(r3.is_approximate, false);
+
+        let r4 = evaluate("(sqrt(2))^4".to_owned()).expect("evaluation should succeed");
+        assert_eq!(r4.value, Some(4.0));
+        assert_eq!(r4.is_approximate, false);
+
+        let r5 = evaluate("(1 / pi) * pi".to_owned()).expect("evaluation should succeed");
+        assert_eq!(r5.value, Some(1.0));
+        assert_eq!(r5.is_approximate, false);
+
+        let r6 = evaluate("log(2)(1/8)".to_owned()).expect("evaluation should succeed");
+        assert_eq!(r6.value, Some(-3.0));
+        assert_eq!(r6.is_approximate, false);
     }
 
     #[test]

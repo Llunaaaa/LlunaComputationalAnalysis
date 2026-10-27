@@ -65,11 +65,24 @@ inline core::NumberValue eval_root(const core::NumberValue& idx, const core::Num
 
     if (arg.kind == core::ValueKind::ExactRational && arg.rat.is_integer()) {
         long long abs_val = std::abs(arg.rat.num);
-        long long root_cand = static_cast<long long>(std::round(std::pow(static_cast<double>(abs_val), 1.0 / static_cast<double>(n))));
-        long long p = 1;
-        for (long long i = 0; i < n; ++i) p *= root_cand;
-        if (p == abs_val) {
-            return core::NumberValue(static_cast<long long>(sign * root_cand));
+        if (abs_val == 0) return core::NumberValue(0);
+        if (abs_val == 1) return core::NumberValue(static_cast<long long>(sign * 1));
+        if (n <= 62) {
+            long long root_cand = static_cast<long long>(std::round(std::pow(static_cast<double>(abs_val), 1.0 / static_cast<double>(n))));
+            if (root_cand > 0) {
+                long long p = 1;
+                bool overflow = false;
+                for (long long i = 0; i < n; ++i) {
+                    if (p > std::numeric_limits<long long>::max() / root_cand) {
+                        overflow = true;
+                        break;
+                    }
+                    p *= root_cand;
+                }
+                if (!overflow && p == abs_val) {
+                    return core::NumberValue(static_cast<long long>(sign * root_cand));
+                }
+            }
         }
     }
 
@@ -113,12 +126,22 @@ inline core::NumberValue eval_log(const core::NumberValue& base, const core::Num
         return core::NumberValue(0);
     }
 
-    // Check if integer log: e.g. log_2(8) = 3, log_10(100) = 2, log_10(1000) = 3
-    if (base.kind == core::ValueKind::ExactRational && base.rat.is_integer() &&
-        arg.kind == core::ValueKind::ExactRational && arg.rat.is_integer()) {
-        auto [is_pow, p] = core::check_integer_log(base.rat.num, arg.rat.num);
-        if (is_pow) {
-            return core::NumberValue(p);
+    // Check if integer log or reciprocal log: e.g. log_2(8) = 3, log_2(1/8) = -3, log_{1/2}(8) = -3, log_{10}(100) = 2
+    if (base.kind == core::ValueKind::ExactRational && arg.kind == core::ValueKind::ExactRational) {
+        long long b_num = base.rat.num, b_den = base.rat.den;
+        long long a_num = arg.rat.num, a_den = arg.rat.den;
+        if (b_den == 1 && a_den == 1) {
+            auto [is_pow, p] = core::check_integer_log(b_num, a_num);
+            if (is_pow) return core::NumberValue(p);
+        } else if (b_den == 1 && a_num == 1) {
+            auto [is_pow, p] = core::check_integer_log(b_num, a_den);
+            if (is_pow) return core::NumberValue(-p);
+        } else if (b_num == 1 && a_den == 1) {
+            auto [is_pow, p] = core::check_integer_log(b_den, a_num);
+            if (is_pow) return core::NumberValue(-p);
+        } else if (b_num == 1 && a_num == 1) {
+            auto [is_pow, p] = core::check_integer_log(b_den, a_den);
+            if (is_pow) return core::NumberValue(p);
         }
     }
 

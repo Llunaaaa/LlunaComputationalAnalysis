@@ -39,17 +39,28 @@ struct Rational {
 };
 
 inline Rational operator+(Rational a, Rational b) {
-    return Rational(a.num * b.den + b.num * a.den, a.den * b.den);
+    long long g = std::gcd(a.den, b.den);
+    long long l_den = a.den / g;
+    long long r_den = b.den / g;
+    long long num = a.num * r_den + b.num * l_den;
+    long long den = l_den * b.den;
+    return Rational(num, den);
 }
 inline Rational operator-(Rational a, Rational b) {
-    return Rational(a.num * b.den - b.num * a.den, a.den * b.den);
+    return a + Rational(-b.num, b.den);
 }
 inline Rational operator*(Rational a, Rational b) {
-    return Rational(a.num * b.num, a.den * b.den);
+    long long g1 = std::gcd(std::abs(a.num), b.den);
+    long long g2 = std::gcd(std::abs(b.num), a.den);
+    long long a_num = a.num / g1;
+    long long b_den = b.den / g1;
+    long long b_num = b.num / g2;
+    long long a_den = a.den / g2;
+    return Rational(a_num * b_num, a_den * b_den);
 }
 inline Rational operator/(Rational a, Rational b) {
     if (b.num == 0) throw std::runtime_error("Cannot divide by zero");
-    return Rational(a.num * b.den, a.den * b.num);
+    return a * Rational(b.den, b.num);
 }
 
 inline std::pair<long long, long long> simplify_sqrt(long long n) {
@@ -522,10 +533,30 @@ inline NumberValue divide(const NumberValue& a, const NumberValue& b) {
         return res;
     }
 
+    // Rational / Constant (e.g. 1 / pi -> pi^-1, 2 / pi -> 2*pi^-1)
+    if (a.kind == ValueKind::ExactRational && b.kind == ValueKind::ExactConstant) {
+        NumberValue res;
+        res.kind = ValueKind::ExactConstant;
+        res.rat = a.rat / b.rat;
+        res.pi_exp = -b.pi_exp;
+        res.e_exp = -b.e_exp;
+        return res;
+    }
+
     // Radical / Rational
     if (a.kind == ValueKind::ExactRadical && b.kind == ValueKind::ExactRational) {
         NumberValue res = a;
         res.rat = a.rat / b.rat;
+        return res;
+    }
+
+    // Rational / Radical (e.g. 1 / sqrt(2) -> (1/2)*sqrt(2), 2 / sqrt(2) -> sqrt(2))
+    if (a.kind == ValueKind::ExactRational && b.kind == ValueKind::ExactRadical) {
+        Rational coeff = (a.rat / b.rat) / Rational(b.radical);
+        NumberValue res;
+        res.kind = ValueKind::ExactRadical;
+        res.rat = coeff;
+        res.radical = b.radical;
         return res;
     }
 
@@ -571,10 +602,40 @@ inline NumberValue power(const NumberValue& a, const NumberValue& b) {
         }
     }
 
-    // Radical ^ 2
-    if (a.kind == ValueKind::ExactRadical && b.kind == ValueKind::ExactRational && b.rat.is_integer() && b.rat.num == 2) {
-        Rational q2 = a.rat * a.rat;
-        return NumberValue(q2 * Rational(a.radical));
+    // Radical ^ Integer (e.g. (sqrt(2))^2 = 2, (sqrt(2))^4 = 4, (sqrt(2))^3 = 2*sqrt(2))
+    if (a.kind == ValueKind::ExactRadical && b.kind == ValueKind::ExactRational && b.rat.is_integer()) {
+        long long p = b.rat.num;
+        if (std::abs(p) <= 25) {
+            if (p == 0) return NumberValue(1);
+            long long abs_p = std::abs(p);
+
+            Rational q_pow(1);
+            for (long long i = 0; i < abs_p; ++i) {
+                q_pow = q_pow * a.rat;
+            }
+
+            long long k = abs_p / 2;
+            Rational r_pow(1);
+            for (long long i = 0; i < k; ++i) {
+                r_pow = r_pow * Rational(a.radical);
+            }
+
+            if (abs_p % 2 == 0) {
+                Rational total = q_pow * r_pow;
+                if (p < 0) total = Rational(1) / total;
+                return NumberValue(total);
+            } else {
+                Rational coeff = q_pow * r_pow;
+                if (p < 0) {
+                    coeff = Rational(1) / (coeff * Rational(a.radical));
+                }
+                NumberValue res;
+                res.kind = ValueKind::ExactRadical;
+                res.rat = coeff;
+                res.radical = a.radical;
+                return res;
+            }
+        }
     }
 
     // Constant ^ Integer
