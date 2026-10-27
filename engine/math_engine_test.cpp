@@ -87,7 +87,26 @@ int main() {
     assert_exact("π", "π");
     assert_exact("e", "e");
     assert_exact("sqrt(2)", "sqrt(2)");
-    assert_exact("log(2)", "log(2)");
+
+    // Symbolic cancellation tests
+    assert_value("pi / pi", 1.0);
+    assert_approximate("pi / pi", 0);
+    assert_value("2pi / pi", 2.0);
+    assert_approximate("2pi / pi", 0);
+    assert_value("pi - pi", 0.0);
+    assert_approximate("pi - pi", 0);
+    assert_value("e / e", 1.0);
+    assert_approximate("e / e", 0);
+    assert_value("e - e", 0.0);
+    assert_approximate("e - e", 0);
+    assert_value("ln(e)", 1.0);
+    assert_approximate("ln(e)", 0);
+    assert_value("sqrt(2) * sqrt(2)", 2.0);
+    assert_approximate("sqrt(2) * sqrt(2)", 0);
+    assert_value("sqrt(2) / sqrt(2)", 1.0);
+    assert_approximate("sqrt(2) / sqrt(2)", 0);
+    assert_value("2sqrt(2) / sqrt(2)", 2.0);
+    assert_approximate("2sqrt(2) / sqrt(2)", 0);
 
     assert_approximate("sqrt(2)", 1);
     assert_approximate("sqrt(16)", 0);

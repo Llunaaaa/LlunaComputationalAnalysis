@@ -35,6 +35,12 @@ public:
 
     NumberValue evaluate() const override {
         if (!def_) throw std::runtime_error("Unknown constant");
+        if (def_->name == "pi" || def_->name == "π") {
+            return NumberValue::make_pi();
+        }
+        if (def_->name == "e") {
+            return NumberValue::make_e();
+        }
         return NumberValue(def_->compute(), def_->is_irrational, def_->symbol);
     }
 

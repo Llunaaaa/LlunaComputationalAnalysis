@@ -105,6 +105,21 @@ mod tests {
     }
 
     #[test]
+    fn evaluates_symbolic_cancellations() {
+        let r1 = evaluate("pi / pi".to_owned()).expect("evaluation should succeed");
+        assert_eq!(r1.value, Some(1.0));
+        assert_eq!(r1.is_approximate, false);
+
+        let r2 = evaluate("sqrt(2) / sqrt(2)".to_owned()).expect("evaluation should succeed");
+        assert_eq!(r2.value, Some(1.0));
+        assert_eq!(r2.is_approximate, false);
+
+        let r3 = evaluate("sqrt(2) * sqrt(2)".to_owned()).expect("evaluation should succeed");
+        assert_eq!(r3.value, Some(2.0));
+        assert_eq!(r3.is_approximate, false);
+    }
+
+    #[test]
     fn evaluates_gamma_factorials() {
         let r1 = evaluate("9.5!".to_owned()).expect("evaluation should succeed");
         assert!(r1.display_value.unwrap().starts_with("1133278"));

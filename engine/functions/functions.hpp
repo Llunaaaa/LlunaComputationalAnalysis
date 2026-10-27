@@ -14,15 +14,26 @@ inline core::NumberValue eval_sqrt(const core::NumberValue& arg) {
         throw std::runtime_error("Cannot take the square root of a negative value");
     }
     if (arg.is_zero()) {
-        return core::NumberValue(0.0, false);
+        return core::NumberValue(0);
+    }
+    if (arg.kind == core::ValueKind::ExactRational) {
+        return core::NumberValue::make_sqrt(arg.rat);
+    }
+    if (arg.kind == core::ValueKind::ExactConstant) {
+        if (arg.pi_exp % 2 == 0 && arg.e_exp % 2 == 0) {
+            core::NumberValue v;
+            v.kind = core::ValueKind::ExactConstant;
+            v.rat = core::NumberValue::make_sqrt(arg.rat).rat;
+            v.pi_exp = arg.pi_exp / 2;
+            v.e_exp = arg.e_exp / 2;
+            return v;
+        }
     }
 
-    if (!arg.is_large()) {
-        double d = arg.value_;
+    double d = arg.to_double();
+    if (std::isfinite(d)) {
         double res = std::sqrt(d);
-        bool is_exact = (res == std::floor(res));
-        std::string exact_str = is_exact ? "" : "sqrt(" + std::to_string(static_cast<long long>(d)) + ")";
-        return core::NumberValue(res, !is_exact, exact_str);
+        return core::NumberValue::make_approx(res);
     }
 
     long long exp = arg.exponent();
@@ -46,11 +57,26 @@ inline core::NumberValue eval_root(const core::NumberValue& idx, const core::Num
     }
     double sign = arg.is_negative() ? -1.0 : 1.0;
 
-    if (!arg.is_large()) {
-        double d = std::fabs(arg.value_);
+    if (n == 1) return arg;
+    if (n == 2) {
+        if (sign < 0) throw std::runtime_error("Cannot take the square root of a negative value");
+        return eval_sqrt(arg);
+    }
+
+    if (arg.kind == core::ValueKind::ExactRational && arg.rat.is_integer()) {
+        long long abs_val = std::abs(arg.rat.num);
+        long long root_cand = static_cast<long long>(std::round(std::pow(static_cast<double>(abs_val), 1.0 / static_cast<double>(n))));
+        long long p = 1;
+        for (long long i = 0; i < n; ++i) p *= root_cand;
+        if (p == abs_val) {
+            return core::NumberValue(static_cast<long long>(sign * root_cand));
+        }
+    }
+
+    double d = std::fabs(arg.to_double());
+    if (std::isfinite(d)) {
         double res = std::pow(d, 1.0 / static_cast<double>(n));
-        bool is_exact = (res == std::floor(res));
-        return core::NumberValue(sign * res, !is_exact, "");
+        return core::NumberValue::make_approx(sign * res);
     }
 
     double log10_val = std::log10(std::fabs(arg.mantissa())) + static_cast<double>(arg.exponent());
@@ -62,33 +88,68 @@ inline core::NumberValue eval_root(const core::NumberValue& idx, const core::Num
 }
 
 inline core::NumberValue eval_log(const core::NumberValue& base, const core::NumberValue& arg) {
-    if (base.is_negative() || base.is_zero() || (!base.is_large() && base.value_ == 1.0)) {
+    if (base.is_negative() || base.is_zero()) {
         throw std::runtime_error("Logarithm base must be positive and not equal to 1");
     }
     if (arg.is_negative() || arg.is_zero()) {
         throw std::runtime_error("Logarithm argument must be positive");
     }
+
+    // Symbolic cancellation: log_b(b) = 1
+    if (base.kind == arg.kind) {
+        if (base.kind == core::ValueKind::ExactRational && base.rat.num == arg.rat.num && base.rat.den == arg.rat.den) {
+            if (base.rat.is_one()) throw std::runtime_error("Logarithm base cannot be 1");
+            return core::NumberValue(1);
+        }
+        if (base.kind == core::ValueKind::ExactConstant && base.pi_exp == arg.pi_exp && base.e_exp == arg.e_exp && base.rat.num == arg.rat.num && base.rat.den == arg.rat.den) {
+            return core::NumberValue(1);
+        }
+    }
+
+    if (base.kind == core::ValueKind::ExactRational && base.rat.is_one()) {
+        throw std::runtime_error("Logarithm base cannot be 1");
+    }
+    if (arg.kind == core::ValueKind::ExactRational && arg.rat.is_one()) {
+        return core::NumberValue(0);
+    }
+
+    // Check if integer log: e.g. log_2(8) = 3, log_10(100) = 2, log_10(1000) = 3
+    if (base.kind == core::ValueKind::ExactRational && base.rat.is_integer() &&
+        arg.kind == core::ValueKind::ExactRational && arg.rat.is_integer()) {
+        auto [is_pow, p] = core::check_integer_log(base.rat.num, arg.rat.num);
+        if (is_pow) {
+            return core::NumberValue(p);
+        }
+    }
+
     double log10_arg = std::log10(std::fabs(arg.mantissa())) + static_cast<double>(arg.exponent());
     double log10_base = std::log10(std::fabs(base.mantissa())) + static_cast<double>(base.exponent());
     double res = log10_arg / log10_base;
     if (!std::isfinite(res)) {
         throw std::runtime_error("The result is not finite");
     }
-    bool is_exact = (res == std::floor(res));
-    return core::NumberValue(res, !is_exact, is_exact ? "" : "log(" + arg.format() + ")");
+    return core::NumberValue::make_approx(res);
 }
 
 inline core::NumberValue eval_ln(const core::NumberValue& arg) {
     if (arg.is_negative() || arg.is_zero()) {
         throw std::runtime_error("Logarithm argument must be positive");
     }
+
+    // Symbolic cancellation: ln(e) = 1, ln(e^m) = m
+    if (arg.kind == core::ValueKind::ExactConstant && arg.pi_exp == 0 && arg.rat.is_one()) {
+        return core::NumberValue(arg.e_exp);
+    }
+    if (arg.kind == core::ValueKind::ExactRational && arg.rat.is_one()) {
+        return core::NumberValue(0);
+    }
+
     double log10_arg = std::log10(std::fabs(arg.mantissa())) + static_cast<double>(arg.exponent());
-    double res = log10_arg * std::log(10.0);
+    double res = log10_arg / std::log10(constants::compute_euler());
     if (!std::isfinite(res)) {
         throw std::runtime_error("The result is not finite");
     }
-    bool is_exact = (res == std::floor(res));
-    return core::NumberValue(res, !is_exact, "");
+    return core::NumberValue::make_approx(res);
 }
 
 inline core::NumberValue eval_factorial(const core::NumberValue& arg) {
