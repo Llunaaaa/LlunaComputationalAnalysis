@@ -3,6 +3,7 @@ use serde::Serialize;
 #[repr(C)]
 struct NativeMathResult {
     error_code: i32,
+    is_approximate: i32,
     value: f64,
     error_message: [u8; 256],
     exact_value: [u8; 256],
@@ -16,6 +17,7 @@ unsafe extern "C" {
 struct Evaluation {
     value: Option<f64>,
     exact: Option<String>,
+    is_approximate: bool,
     error: Option<String>,
 }
 
@@ -29,6 +31,7 @@ fn evaluate(expression: String) -> Result<Evaluation, String> {
         return Ok(Evaluation {
             value: Some(result.value),
             exact: read_message(&result.exact_value),
+            is_approximate: result.is_approximate != 0,
             error: None,
         });
     }
@@ -42,6 +45,7 @@ fn evaluate(expression: String) -> Result<Evaluation, String> {
     Ok(Evaluation {
         value: None,
         exact: None,
+        is_approximate: false,
         error: Some(message),
     })
 }
@@ -75,6 +79,15 @@ mod tests {
     fn evaluates_arithmetic_through_native_engine() {
         let result = evaluate("2 * (3 + 4)".to_owned()).expect("evaluation should succeed");
         assert_eq!(result.value, Some(14.0));
+        assert_eq!(result.is_approximate, false);
+        assert_eq!(result.error, None);
+    }
+
+    #[test]
+    fn evaluates_irrational_as_approximation() {
+        let result = evaluate("sqrt(2)".to_owned()).expect("evaluation should succeed");
+        assert!(result.value.is_some());
+        assert_eq!(result.is_approximate, true);
         assert_eq!(result.error, None);
     }
 

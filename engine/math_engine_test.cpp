@@ -22,6 +22,12 @@ void assert_exact(const char* expression, const char* expected) {
     assert(std::strcmp(result.exact_value, expected) == 0);
 }
 
+void assert_approximate(const char* expression, int expected_approx) {
+    const MathResult result = evaluate_expression(expression);
+    assert(result.error_code == 0);
+    assert(result.is_approximate == expected_approx);
+}
+
 int main() {
     assert_value("2 + 3 * 4", 14.0);
     assert_value("(2 + 3) * 4", 20.0);
@@ -47,6 +53,15 @@ int main() {
     assert_exact("e", "e");
     assert_exact("sqrt(2)", "sqrt(2)");
     assert_exact("log(2)", "log(2)");
+
+    assert_approximate("sqrt(2)", 1);
+    assert_approximate("sqrt(16)", 0);
+    assert_approximate("pi", 1);
+    assert_approximate("e", 1);
+    assert_approximate("5!", 0);
+    assert_approximate("2 + 3 * 4", 0);
+    assert_approximate("log(2)(3)", 1);
+    assert_approximate("log(2)(8)", 0);
 
     assert_error("1 / 0", "Cannot divide by zero");
     assert_error("sqrt(-1)", "Cannot take the square root of a negative value");

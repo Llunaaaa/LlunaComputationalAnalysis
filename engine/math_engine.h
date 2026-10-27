@@ -6,6 +6,7 @@ extern "C" {
 
 typedef struct MathResult {
     int error_code;
+    int is_approximate;
     double value;
     char error_message[256];
     char exact_value[256];

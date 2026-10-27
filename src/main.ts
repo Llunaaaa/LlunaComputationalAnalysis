@@ -28,6 +28,7 @@ type Section = (typeof sections)[number];
 interface Evaluation {
   value: number | null;
   exact: string | null;
+  is_approximate: boolean;
   error: string | null;
 }
 
@@ -174,7 +175,6 @@ function createRowElement(row: ExpressionRowData, index: number): HTMLElement {
   mf.value = row.latex;
   mf.mathVirtualKeyboardPolicy = 'manual';
   mf.smartFence = false;
-  mf.setAttribute('placeholder', 'Type an expression');
   mf.setAttribute('aria-label', `Expression ${index + 1}`);
 
   // Delete button
@@ -271,14 +271,10 @@ function updateResultElement(el: HTMLElement, row: ExpressionRowData) {
 
   if (row.evaluation?.value !== null && row.evaluation?.value !== undefined) {
     const val = row.evaluation.value;
-    const exact = row.evaluation.exact;
     const formattedVal = Number.isInteger(val) ? String(val) : String(val);
+    const symbol = row.evaluation.is_approximate ? '≈' : '=';
 
-    if (exact && !isPlainNumber(exact)) {
-      el.innerHTML = `<span>${escapeHtml(exact)}</span> <span style="color:#727870">≈</span> <span>${formattedVal}</span>`;
-    } else {
-      el.textContent = `= ${formattedVal}`;
-    }
+    el.textContent = `${symbol} ${formattedVal}`;
     el.className = 'expression-row-result';
     return;
   }
@@ -290,7 +286,7 @@ function updateResultElement(el: HTMLElement, row: ExpressionRowData) {
 async function evaluateRow(row: ExpressionRowData, resultEl: HTMLElement) {
   const engineExpr = latexToEngine(row.latex);
   if (!engineExpr.trim()) {
-    row.evaluation = { value: null, exact: null, error: 'Enter an expression' };
+    row.evaluation = { value: null, exact: null, is_approximate: false, error: 'Enter an expression' };
     updateResultElement(resultEl, row);
     return;
   }
@@ -304,6 +300,7 @@ async function evaluateRow(row: ExpressionRowData, resultEl: HTMLElement) {
     row.evaluation = {
       value: null,
       exact: null,
+      is_approximate: false,
       error: err instanceof Error ? err.message : 'Evaluation failed',
     };
   } finally {
@@ -363,10 +360,6 @@ function scrollStackToBottom() {
       stack.scrollTop = stack.scrollHeight;
     });
   }
-}
-
-function isPlainNumber(str: string): boolean {
-  return /^-?(?:\d+\.?\d*|\.\d+)$/.test(str);
 }
 
 function escapeHtml(str: string): string {

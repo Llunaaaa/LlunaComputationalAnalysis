@@ -318,6 +318,7 @@ extern "C" MathResult evaluate_expression(const char* expression) {
         const ParsedValue parsed = Parser(expression).parse();
         MathResult result{};
         result.value = parsed.numeric;
+        result.is_approximate = (parsed.symbolic || (parsed.numeric != std::floor(parsed.numeric))) ? 1 : 0;
         std::strncpy(result.exact_value, parsed.exact.c_str(), sizeof(result.exact_value) - 1);
         return result;
     } catch (const std::exception& error) {

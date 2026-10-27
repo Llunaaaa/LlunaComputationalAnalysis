@@ -263,6 +263,14 @@ h1 {
   font-weight: 600;
 }
 
+math-field,
+.expression-mathfield {
+  --primary-color: #f4f4f0;
+  --smart-fence-color: currentColor;
+  --contains-highlight-background-color: transparent;
+  --contains-highlight-color: currentColor;
+}
+
 .expression-mathfield {
   flex: 1;
   min-width: 0;
@@ -273,6 +281,10 @@ h1 {
   outline: none;
   font-size: clamp(1.25rem, 2.2vw, 1.55rem);
   padding: 4px 0;
+  --primary-color: #f4f4f0;
+  --smart-fence-color: currentColor;
+  --contains-highlight-background-color: transparent;
+  --contains-highlight-color: currentColor;
   --selection-background-color: #363b36;
   --selection-color: #f4f4f0;
   --caret-color: #f4f4f0;
