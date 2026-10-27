@@ -289,21 +289,48 @@ public:
 
     std::string format() const {
         if (kind == ValueKind::ExactRational) {
-            if (rat.is_integer()) return std::to_string(rat.num);
+            if (rat.is_integer()) {
+                if (std::abs(rat.num) <= 10000000000000000LL) { // <= 1e16
+                    return std::to_string(rat.num);
+                }
+                char buf[64];
+                std::snprintf(buf, sizeof(buf), "%.15g", rat.to_double());
+                return buf;
+            }
             double d = rat.to_double();
             char buf[64];
             std::snprintf(buf, sizeof(buf), "%.15g", d);
             return buf;
         }
-        if (kind == ValueKind::RealApprox && sci_exp != 0) {
+
+        auto [man, exp] = to_scientific();
+        if (man == 0.0) return "0";
+
+        // Scientific notation only appears if exponent > 16 or < -6
+        if (exp > 16 || exp < -6) {
             char buf[64];
-            std::snprintf(buf, sizeof(buf), "%.15ge%+lld", real_val, sci_exp);
+            std::snprintf(buf, sizeof(buf), "%.15ge%+lld", man, exp);
             return buf;
         }
-        double d = to_double();
+
+        double val = to_double();
+        if (val == std::floor(val) && std::fabs(val) < 1e16) {
+            return std::to_string(static_cast<long long>(val));
+        }
+
         char buf[64];
-        std::snprintf(buf, sizeof(buf), "%.15g", d);
-        return buf;
+        std::snprintf(buf, sizeof(buf), "%.15g", val);
+        std::string s(buf);
+        if (s.find('e') != std::string::npos || s.find('E') != std::string::npos) {
+            std::snprintf(buf, sizeof(buf), "%.*f", static_cast<int>(std::max(0LL, 15 - exp)), val);
+            s = buf;
+            while (s.find('.') != std::string::npos && (s.back() == '0' || s.back() == '.')) {
+                bool was_dot = (s.back() == '.');
+                s.pop_back();
+                if (was_dot) break;
+            }
+        }
+        return s;
     }
 };
 

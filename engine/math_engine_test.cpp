@@ -73,6 +73,10 @@ int main() {
     assert_error("(-3)!", "Factorial is undefined for negative integers");
     assert_error("(-1)!", "Factorial is undefined for negative integers");
     assert_value("2sqrt(2)", 2.0 * std::sqrt(2.0));
+    assert_display_prefix("10sqrt(2)", "14.1421");
+    assert_display_prefix("5pi", "15.7079");
+    assert_display_prefix("10^15", "1000000000000000");
+    assert_display_prefix("10^17", "1e+17");
     assert_value("2pi", 2.0 * (4.0 * std::atan(1.0)));
     assert_value("2(3+4)", 14.0);
     assert_value("(2)(3)", 6.0);
