@@ -10,23 +10,23 @@
 namespace lluna::functions {
 
 inline core::NumberValue eval_sqrt(const core::NumberValue& arg) {
-    if (arg.mantissa < 0.0) {
+    if (arg.is_negative()) {
         throw std::runtime_error("Cannot take the square root of a negative value");
     }
-    if (arg.mantissa == 0.0) {
+    if (arg.is_zero()) {
         return core::NumberValue(0.0, false);
     }
 
-    double d = arg.to_double();
-    if (std::isfinite(d)) {
+    if (!arg.is_large()) {
+        double d = arg.value_;
         double res = std::sqrt(d);
         bool is_exact = (res == std::floor(res));
         std::string exact_str = is_exact ? "" : "sqrt(" + std::to_string(static_cast<long long>(d)) + ")";
         return core::NumberValue(res, !is_exact, exact_str);
     }
 
-    long long exp = arg.exponent;
-    double man = arg.mantissa;
+    long long exp = arg.exponent();
+    double man = arg.mantissa();
     if (exp % 2 != 0) {
         man *= 10.0;
         exp -= 1;
@@ -37,25 +37,23 @@ inline core::NumberValue eval_sqrt(const core::NumberValue& arg) {
 }
 
 inline core::NumberValue eval_root(const core::NumberValue& idx, const core::NumberValue& arg) {
-    if (!idx.is_integer() || idx.mantissa <= 0.0) {
+    if (!idx.is_integer() || idx.is_negative() || idx.is_zero()) {
         throw std::runtime_error("Root index must be a positive integer");
     }
-    long long n = static_cast<long long>(idx.to_double());
-    if (arg.mantissa < 0.0 && n % 2 == 0) {
+    long long n = idx.to_integer();
+    if (arg.is_negative() && n % 2 == 0) {
         throw std::runtime_error("Even roots cannot contain a negative value");
     }
-    double sign = (arg.mantissa < 0.0) ? -1.0 : 1.0;
-    core::NumberValue abs_arg = arg;
-    if (sign < 0) abs_arg.mantissa = -abs_arg.mantissa;
+    double sign = arg.is_negative() ? -1.0 : 1.0;
 
-    double d = abs_arg.to_double();
-    if (std::isfinite(d)) {
+    if (!arg.is_large()) {
+        double d = std::fabs(arg.value_);
         double res = std::pow(d, 1.0 / static_cast<double>(n));
         bool is_exact = (res == std::floor(res));
         return core::NumberValue(sign * res, !is_exact, "");
     }
 
-    double log10_val = std::log10(abs_arg.mantissa) + static_cast<double>(abs_arg.exponent);
+    double log10_val = std::log10(std::fabs(arg.mantissa())) + static_cast<double>(arg.exponent());
     double res_log = log10_val / static_cast<double>(n);
     long long res_exp = static_cast<long long>(std::floor(res_log));
     double rem = res_log - static_cast<double>(res_exp);
@@ -64,14 +62,14 @@ inline core::NumberValue eval_root(const core::NumberValue& idx, const core::Num
 }
 
 inline core::NumberValue eval_log(const core::NumberValue& base, const core::NumberValue& arg) {
-    if (base.mantissa <= 0.0 || (base.exponent == 0 && base.mantissa == 1.0)) {
+    if (base.is_negative() || base.is_zero() || (!base.is_large() && base.value_ == 1.0)) {
         throw std::runtime_error("Logarithm base must be positive and not equal to 1");
     }
-    if (arg.mantissa <= 0.0) {
+    if (arg.is_negative() || arg.is_zero()) {
         throw std::runtime_error("Logarithm argument must be positive");
     }
-    double log10_arg = std::log10(arg.mantissa) + static_cast<double>(arg.exponent);
-    double log10_base = std::log10(base.mantissa) + static_cast<double>(base.exponent);
+    double log10_arg = std::log10(std::fabs(arg.mantissa())) + static_cast<double>(arg.exponent());
+    double log10_base = std::log10(std::fabs(base.mantissa())) + static_cast<double>(base.exponent());
     double res = log10_arg / log10_base;
     if (!std::isfinite(res)) {
         throw std::runtime_error("The result is not finite");
@@ -81,10 +79,10 @@ inline core::NumberValue eval_log(const core::NumberValue& base, const core::Num
 }
 
 inline core::NumberValue eval_ln(const core::NumberValue& arg) {
-    if (arg.mantissa <= 0.0) {
+    if (arg.is_negative() || arg.is_zero()) {
         throw std::runtime_error("Logarithm argument must be positive");
     }
-    double log10_arg = std::log10(arg.mantissa) + static_cast<double>(arg.exponent);
+    double log10_arg = std::log10(std::fabs(arg.mantissa())) + static_cast<double>(arg.exponent());
     double res = log10_arg * std::log(10.0);
     if (!std::isfinite(res)) {
         throw std::runtime_error("The result is not finite");
@@ -94,7 +92,7 @@ inline core::NumberValue eval_ln(const core::NumberValue& arg) {
 }
 
 inline core::NumberValue eval_factorial(const core::NumberValue& arg) {
-    if (arg.mantissa < 0.0) {
+    if (arg.is_negative()) {
         throw std::runtime_error("Cannot take factorial of a negative value");
     }
     if (!arg.is_integer()) {
@@ -103,7 +101,7 @@ inline core::NumberValue eval_factorial(const core::NumberValue& arg) {
 
     // Computational Guardrail: upper bound of 1e18 (1 quintillion) to prevent
     // system freeze and exponent tracking overflow
-    if (arg.exponent > 18 || (arg.exponent == 18 && std::fabs(arg.mantissa) > 1.0) || arg.to_double() > 1e18) {
+    if (arg.exponent() > 18 || (arg.exponent() == 18 && std::fabs(arg.mantissa()) > 1.0) || arg.to_double() > 1e18) {
         throw std::runtime_error("Operation requires an unreasonable amount of computational power");
     }
 

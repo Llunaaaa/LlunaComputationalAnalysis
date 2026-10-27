@@ -54,7 +54,7 @@ public:
     NumberValue evaluate() const override {
         auto res = operand_->evaluate();
         if (op_ == '-') {
-            res.mantissa = -res.mantissa;
+            res.negate();
         }
         return res;
     }

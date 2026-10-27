@@ -58,6 +58,8 @@ int main() {
     assert_approximate("100001!", 1);
     assert_display_prefix("1000000!", "8.26393");
     assert_approximate("1000000!", 1);
+    assert_display_prefix("1000001!", "8.2639");
+    assert_approximate("1000001!", 1);
     assert_error("9^(100000!)", "Operation requires an unreasonable amount of computational power");
     assert_error("(100000!)!", "Operation requires an unreasonable amount of computational power");
     assert_error("9.5!", "Factorial of a non-integer requires the gamma function");
