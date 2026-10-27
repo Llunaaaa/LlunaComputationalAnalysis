@@ -29,13 +29,19 @@ public:
                 continue;
             }
 
-            // UTF-8 π character (0xCF 0x80)
-            if (static_cast<unsigned char>(ch) == 0xCF &&
-                pos_ + 1 < input_.size() &&
-                static_cast<unsigned char>(input_[pos_ + 1]) == 0x80) {
-                tokens.push_back(Token::make(TokenType::Identifier, "π", pos_));
-                pos_ += 2;
-                continue;
+            // UTF-8 π character (0xCF 0x80) and ϕ / φ characters (0xCF 0x95 / 0xCF 0x86)
+            if (static_cast<unsigned char>(ch) == 0xCF && pos_ + 1 < input_.size()) {
+                unsigned char next_ch = static_cast<unsigned char>(input_[pos_ + 1]);
+                if (next_ch == 0x80) {
+                    tokens.push_back(Token::make(TokenType::Identifier, "π", pos_));
+                    pos_ += 2;
+                    continue;
+                }
+                if (next_ch == 0x95 || next_ch == 0x86) {
+                    tokens.push_back(Token::make(TokenType::Identifier, "ϕ", pos_));
+                    pos_ += 2;
+                    continue;
+                }
             }
 
             // Identifiers / words: [a-zA-Z_][a-zA-Z0-9_]*
@@ -77,6 +83,10 @@ public:
                     break;
                 case ')':
                     tokens.push_back(Token::make(TokenType::RParen, ")", start));
+                    pos_++;
+                    break;
+                case '|':
+                    tokens.push_back(Token::make(TokenType::Pipe, "|", start));
                     pos_++;
                     break;
                 case ',':

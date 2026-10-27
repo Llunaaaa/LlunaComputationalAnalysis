@@ -336,8 +336,91 @@ inline core::NumberValue eval_factorial(const core::NumberValue& arg) {
     return core::NumberValue::from_scientific(mantissa, exponent, true);
 }
 
+inline core::NumberValue eval_abs(const core::NumberValue& arg) {
+    if (!arg.is_negative()) return arg;
+    core::NumberValue res = arg;
+    res.negate();
+    return res;
+}
+
+inline core::NumberValue eval_gcd(const core::NumberValue& a, const core::NumberValue& b) {
+    if (!a.is_integer() || !b.is_integer()) {
+        throw std::runtime_error("gcd requires integer arguments");
+    }
+    long long n1 = std::abs(a.to_integer());
+    long long n2 = std::abs(b.to_integer());
+    return core::NumberValue(static_cast<long long>(std::gcd(n1, n2)));
+}
+
+inline core::NumberValue eval_lcm(const core::NumberValue& a, const core::NumberValue& b) {
+    if (!a.is_integer() || !b.is_integer()) {
+        throw std::runtime_error("lcm requires integer arguments");
+    }
+    long long n1 = std::abs(a.to_integer());
+    long long n2 = std::abs(b.to_integer());
+    if (n1 == 0 || n2 == 0) return core::NumberValue(0);
+    return core::NumberValue(static_cast<long long>(std::lcm(n1, n2)));
+}
+
+inline core::NumberValue eval_mod(const core::NumberValue& a, const core::NumberValue& b) {
+    if (b.is_zero()) {
+        throw std::runtime_error("Cannot divide by zero");
+    }
+    if (a.is_integer() && b.is_integer()) {
+        long long n1 = a.to_integer();
+        long long n2 = b.to_integer();
+        long long rem = n1 % n2;
+        if (rem < 0 && n2 > 0) rem += n2;
+        return core::NumberValue(rem);
+    }
+    double d1 = a.to_double();
+    double d2 = b.to_double();
+    double rem = std::fmod(d1, d2);
+    if (rem < 0.0 && d2 > 0.0) rem += d2;
+    return core::NumberValue::make_approx(rem);
+}
+
+inline core::NumberValue eval_nCr(const core::NumberValue& a, const core::NumberValue& b) {
+    if (!a.is_integer() || !b.is_integer()) {
+        throw std::runtime_error("Combinations (nCr) require integer arguments");
+    }
+    long long n = a.to_integer();
+    long long r = b.to_integer();
+    if (r < 0 || r > n) return core::NumberValue(0);
+    if (r == 0 || r == n) return core::NumberValue(1);
+    if (r > n - r) r = n - r;
+    if (n <= 62) {
+        long long res = 1;
+        for (long long i = 1; i <= r; ++i) {
+            res = (res * (n - i + 1)) / i;
+        }
+        return core::NumberValue(res);
+    }
+    return core::divide(eval_factorial(a), core::multiply(eval_factorial(b), eval_factorial(core::NumberValue(n - r))));
+}
+
+inline core::NumberValue eval_nPr(const core::NumberValue& a, const core::NumberValue& b) {
+    if (!a.is_integer() || !b.is_integer()) {
+        throw std::runtime_error("Permutations (nPr) require integer arguments");
+    }
+    long long n = a.to_integer();
+    long long r = b.to_integer();
+    if (r < 0 || r > n) return core::NumberValue(0);
+    if (r == 0) return core::NumberValue(1);
+    if (n <= 20) {
+        long long res = 1;
+        for (long long i = 0; i < r; ++i) {
+            res *= (n - i);
+        }
+        return core::NumberValue(res);
+    }
+    return core::divide(eval_factorial(a), eval_factorial(core::NumberValue(n - r)));
+}
+
 inline bool is_function_name(const std::string& name) {
-    return name == "sqrt" || name == "root" || name == "log" || name == "ln";
+    return name == "sqrt" || name == "root" || name == "log" || name == "ln" ||
+           name == "abs" || name == "gcd" || name == "lcm" || name == "mod" ||
+           name == "nCr" || name == "comb" || name == "nPr" || name == "perm";
 }
 
 } // namespace lluna::functions

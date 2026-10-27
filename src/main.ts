@@ -38,6 +38,7 @@ interface ExpressionRowData {
   latex: string;
   evaluation: Evaluation | null;
   evaluating: boolean;
+  showExactFraction?: boolean;
 }
 
 const app = document.querySelector<HTMLDivElement>('#app');
@@ -213,6 +214,11 @@ function createRowElement(row: ExpressionRowData, index: number): HTMLElement {
   mf.value = row.latex;
   mf.mathVirtualKeyboardPolicy = 'manual';
   mf.smartFence = false;
+  mf.inlineShortcuts = {
+    ...mf.inlineShortcuts,
+    root: '\\sqrt[#?]{#?}',
+    nthroot: '\\sqrt[#?]{#?}',
+  };
   mf.setAttribute('aria-label', `Expression ${index + 1}`);
 
   // Delete button
@@ -294,15 +300,36 @@ function updateResultElement(el: HTMLElement, row: ExpressionRowData) {
   }
 
   if (row.evaluation) {
-    const formattedVal = row.evaluation.display_value ??
+    const hasExactFraction = Boolean(
+      row.evaluation.exact &&
+      row.evaluation.exact.includes('/') &&
+      !row.evaluation.is_approximate
+    );
+
+    let formattedVal = row.evaluation.display_value ??
       (row.evaluation.value !== null && row.evaluation.value !== undefined
         ? (Number.isInteger(row.evaluation.value) ? String(row.evaluation.value) : String(row.evaluation.value))
         : '');
 
+    if (hasExactFraction && row.showExactFraction) {
+      formattedVal = row.evaluation.exact!;
+    }
+
     if (formattedVal) {
       const symbol = row.evaluation.is_approximate ? '≈' : '=';
-      el.textContent = `${symbol} ${formattedVal}`;
+      let html = `<span>${symbol} ${escapeHtml(formattedVal)}</span>`;
+      if (hasExactFraction) {
+        html += ` <button class="fraction-toggle-btn" type="button" title="Toggle exact fraction / decimal">[a/b]</button>`;
+      }
+      el.innerHTML = html;
       el.className = 'expression-row-result';
+
+      const toggleBtn = el.querySelector<HTMLButtonElement>('.fraction-toggle-btn');
+      toggleBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        row.showExactFraction = !row.showExactFraction;
+        updateResultElement(el, row);
+      });
       return;
     }
   }
@@ -312,7 +339,34 @@ function updateResultElement(el: HTMLElement, row: ExpressionRowData) {
 }
 
 async function evaluateRow(row: ExpressionRowData, resultEl: HTMLElement) {
-  const engineExpr = latexToEngine(row.latex);
+  let latexInput = row.latex;
+
+  // Substitute "ans" with the preceding evaluated result
+  if (/(?:\\operatorname\{ans\}|\bans\b)/i.test(latexInput)) {
+    const currentRowIdx = rows.findIndex((r) => r.id === row.id);
+    let prevVal: string | null = null;
+    for (let i = currentRowIdx - 1; i >= 0; i--) {
+      if (rows[i].evaluation && rows[i].evaluation?.value !== null && rows[i].evaluation?.value !== undefined) {
+        prevVal = String(rows[i].evaluation!.value);
+        break;
+      }
+    }
+    if (prevVal !== null) {
+      latexInput = latexInput.replace(/(?:\\operatorname\{ans\}|\bans\b)/gi, `(${prevVal})`);
+    } else {
+      row.evaluation = {
+        value: null,
+        exact: null,
+        display_value: null,
+        is_approximate: false,
+        error: "'ans' has no previous value",
+      };
+      updateResultElement(resultEl, row);
+      return;
+    }
+  }
+
+  const engineExpr = latexToEngine(latexInput);
   if (!engineExpr.trim()) {
     row.evaluation = { value: null, exact: null, display_value: null, is_approximate: false, error: 'Enter an expression' };
     updateResultElement(resultEl, row);

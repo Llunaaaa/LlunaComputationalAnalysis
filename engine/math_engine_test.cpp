@@ -134,6 +134,30 @@ int main() {
     assert_value("log(1/2)(1/8)", 3.0);
     assert_approximate("log(1/2)(1/8)", 0);
 
+    // New elementary arithmetic & combinatorics
+    assert_value("|-5|", 5.0);
+    assert_approximate("|-5|", 0);
+    assert_value("|3-7|", 4.0);
+    assert_approximate("|3-7|", 0);
+    assert_value("abs(-42)", 42.0);
+    assert_approximate("abs(-42)", 0);
+    assert_value("gcd(24, 36)", 12.0);
+    assert_approximate("gcd(24, 36)", 0);
+    assert_value("lcm(24, 36)", 72.0);
+    assert_approximate("lcm(24, 36)", 0);
+    assert_value("mod(17, 5)", 2.0);
+    assert_approximate("mod(17, 5)", 0);
+    assert_value("nCr(10, 3)", 120.0);
+    assert_approximate("nCr(10, 3)", 0);
+    assert_value("comb(5, 2)", 10.0);
+    assert_approximate("comb(5, 2)", 0);
+    assert_value("nPr(10, 3)", 720.0);
+    assert_approximate("nPr(10, 3)", 0);
+    assert_value("perm(5, 2)", 20.0);
+    assert_approximate("perm(5, 2)", 0);
+    assert_approximate("phi", 1);
+    assert_value("phi", (1.0 + std::sqrt(5.0)) / 2.0);
+
     assert_approximate("sqrt(2)", 1);
     assert_approximate("sqrt(16)", 0);
     assert_approximate("pi", 1);

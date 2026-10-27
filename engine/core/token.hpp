@@ -15,6 +15,7 @@ enum class TokenType {
     Exclamation,
     LParen,
     RParen,
+    Pipe,
     Comma,
     Eof
 };

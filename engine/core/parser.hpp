@@ -113,6 +113,16 @@ private:
             return inner;
         }
 
+        if (match(TokenType::Pipe)) {
+            open_pipes_++;
+            auto inner = parse_expression();
+            consume(TokenType::Pipe, "Missing closing pipe for absolute value");
+            open_pipes_--;
+            std::vector<std::unique_ptr<AstNode>> args;
+            args.push_back(std::move(inner));
+            return std::make_unique<FunctionCallNode>("abs", std::move(args));
+        }
+
         if (match(TokenType::Identifier)) {
             std::string name = previous().text;
 
@@ -157,6 +167,9 @@ private:
     }
 
     bool can_start_primary(const Token& t) const {
+        if (t.type == TokenType::Pipe) {
+            return open_pipes_ == 0;
+        }
         return t.type == TokenType::Number ||
                t.type == TokenType::Identifier ||
                t.type == TokenType::LParen;
@@ -199,6 +212,7 @@ private:
 
     std::vector<Token> tokens_;
     std::size_t pos_;
+    int open_pipes_ = 0;
 };
 
 } // namespace lluna::core

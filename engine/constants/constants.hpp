@@ -30,11 +30,18 @@ inline double compute_euler() {
     return sum;
 }
 
+inline double compute_phi() {
+    return (1.0 + std::sqrt(5.0)) / 2.0;
+}
+
 inline const std::vector<ConstantDefinition>& get_all_constants() {
     static const std::vector<ConstantDefinition> registry = {
         {"pi", "π", compute_pi, true},
         {"π", "π", compute_pi, true},
-        {"e", "e", compute_euler, true}
+        {"e", "e", compute_euler, true},
+        {"phi", "ϕ", compute_phi, true},
+        {"ϕ", "ϕ", compute_phi, true},
+        {"φ", "φ", compute_phi, true}
     };
     return registry;
 }

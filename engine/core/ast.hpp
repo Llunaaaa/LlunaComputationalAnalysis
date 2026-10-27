@@ -164,6 +164,59 @@ public:
             return functions::eval_ln(arg);
         }
 
+        if (name_ == "abs") {
+            if (args_.size() != 1) {
+                throw std::runtime_error("abs requires exactly 1 argument");
+            }
+            auto arg = args_[0]->evaluate();
+            return functions::eval_abs(arg);
+        }
+
+        if (name_ == "gcd") {
+            if (args_.size() != 2) {
+                throw std::runtime_error("gcd requires exactly 2 arguments");
+            }
+            auto a = args_[0]->evaluate();
+            auto b = args_[1]->evaluate();
+            return functions::eval_gcd(a, b);
+        }
+
+        if (name_ == "lcm") {
+            if (args_.size() != 2) {
+                throw std::runtime_error("lcm requires exactly 2 arguments");
+            }
+            auto a = args_[0]->evaluate();
+            auto b = args_[1]->evaluate();
+            return functions::eval_lcm(a, b);
+        }
+
+        if (name_ == "mod") {
+            if (args_.size() != 2) {
+                throw std::runtime_error("mod requires exactly 2 arguments");
+            }
+            auto a = args_[0]->evaluate();
+            auto b = args_[1]->evaluate();
+            return functions::eval_mod(a, b);
+        }
+
+        if (name_ == "nCr" || name_ == "comb") {
+            if (args_.size() != 2) {
+                throw std::runtime_error("nCr requires n and r arguments");
+            }
+            auto n = args_[0]->evaluate();
+            auto r = args_[1]->evaluate();
+            return functions::eval_nCr(n, r);
+        }
+
+        if (name_ == "nPr" || name_ == "perm") {
+            if (args_.size() != 2) {
+                throw std::runtime_error("nPr requires n and r arguments");
+            }
+            auto n = args_[0]->evaluate();
+            auto r = args_[1]->evaluate();
+            return functions::eval_nPr(n, r);
+        }
+
         throw std::runtime_error("Unknown function: " + name_);
     }
 

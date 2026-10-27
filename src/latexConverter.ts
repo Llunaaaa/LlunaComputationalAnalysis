@@ -6,7 +6,12 @@ import { convertLatexToAsciiMath } from 'mathlive';
 export function latexToEngine(latex: string): string {
   if (!latex || !latex.trim()) return '';
 
-  let expr = convertLatexToAsciiMath(latex);
+  let s = latex;
+  s = s.replace(/\\binom\s*\{([^{}]+)\}\s*\{([^{}]+)\}/g, 'nCr($1, $2)');
+  s = s.replace(/\\(?:b|p)?mod\s*\{([^{}]+)\}/g, 'mod($1)');
+  s = s.replace(/\\(?:b|p)?mod\s+([0-9a-zA-Z]+)/g, ', $1)');
+
+  let expr = convertLatexToAsciiMath(s);
 
   // Normalize MathLive log output
   // e.g. log _2(8) -> log(2)(8), log _{10}(100) -> log(10)(100)
@@ -21,13 +26,23 @@ export function latexToEngine(latex: string): string {
   // ln (e) -> ln(e)
   expr = expr.replace(/ln\s*\(([^)]+)\)/g, 'ln($1)');
 
+  // Fix spaced function names produced by MathLive
+  expr = expr.replace(/n\s*C\s*r\s*\(/gi, 'nCr(');
+  expr = expr.replace(/n\s*P\s*r\s*\(/gi, 'nPr(');
+  expr = expr.replace(/m\s*o\s*d\s*\(/gi, 'mod(');
+  expr = expr.replace(/g\s*c\s*d\s*\(/gi, 'gcd(');
+  expr = expr.replace(/l\s*c\s*m\s*\(/gi, 'lcm(');
+  expr = expr.replace(/a\s*b\s*s\s*\(/gi, 'abs(');
+  expr = expr.replace(/c\s*o\s*m\s*b\s*\(/gi, 'comb(');
+  expr = expr.replace(/p\s*e\s*r\s*m\s*\(/gi, 'perm(');
+
   // Multiplications
   expr = expr.replace(/cdot/g, '*').replace(/times/g, '*');
 
   // Constants
   expr = expr.replace(/\\pi/g, 'pi').replace(/π/g, 'pi');
+  expr = expr.replace(/\\phi/g, 'phi').replace(/ϕ/g, 'phi').replace(/φ/g, 'phi');
 
-  // Fractions: ensure (a)/(b) format is clean
   // Clean multiple spaces
   expr = expr.replace(/\s+/g, ' ').trim();
 
