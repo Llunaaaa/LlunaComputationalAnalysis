@@ -234,7 +234,7 @@ h1 {
   flex-shrink: 0;
 }
 
-.expression-row.active {
+.expression-row:focus-within {
   border-color: #4d544c;
   background: #111411;
 }
@@ -258,25 +258,32 @@ h1 {
   user-select: none;
 }
 
-.expression-row.active .row-number {
+.expression-row:focus-within .row-number {
   color: #d0d6cc;
   font-weight: 600;
 }
 
-.expression-editor-area {
+.expression-mathfield {
   flex: 1;
   min-width: 0;
   height: auto;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  font-family: "Cambria Math", "Times New Roman", serif;
-  font-size: clamp(1.3rem, 2.2vw, 1.6rem);
-  line-height: 1.35;
+  background: transparent;
   color: var(--white);
-  cursor: text;
-  user-select: none;
-  overflow: visible;
+  border: none;
+  outline: none;
+  font-size: clamp(1.25rem, 2.2vw, 1.55rem);
+  padding: 4px 0;
+  --selection-background-color: #363b36;
+  --selection-color: #f4f4f0;
+  --caret-color: #f4f4f0;
+  --placeholder-color: #555a54;
+  --smart-fence-opacity: 0.8;
+}
+
+.expression-mathfield:focus,
+.expression-mathfield:focus-within {
+  border: none;
+  outline: none;
 }
 
 .row-delete-btn {
@@ -320,173 +327,6 @@ h1 {
 
 .expression-row-result.has-error {
   color: #c98080;
-}
-
-/* ========================================================
-   Mathematical Elements Formatting
-   ======================================================== */
-.math-char {
-  display: inline-block;
-  white-space: pre;
-}
-
-.math-operator {
-  padding: 0 3px;
-  color: #d6ded3;
-}
-
-.math-paren {
-  font-weight: 300;
-  padding: 0 1px;
-  color: #c0c6bd;
-}
-
-.math-fraction {
-  display: inline-flex;
-  flex-direction: column;
-  vertical-align: middle;
-  text-align: center;
-  margin: 0 3px;
-  padding: 2px 0;
-  line-height: 1.15;
-}
-
-.math-numerator {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 4px 2px;
-  min-height: 1.1em;
-}
-
-.math-fraction-line {
-  width: 100%;
-  height: 1.5px;
-  background: #c6ccc2;
-  margin: 1px 0;
-}
-
-.math-denominator {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2px 4px 0;
-  min-height: 1.1em;
-}
-
-.math-sqrt,
-.math-root {
-  display: inline-flex;
-  align-items: stretch;
-  margin: 0 2px;
-}
-
-.math-sqrt-radical {
-  font-size: 1.25em;
-  line-height: 0.95;
-  padding-right: 1px;
-}
-
-.math-sqrt-content {
-  border-top: 1.5px solid #c6ccc2;
-  padding: 2px 4px 0;
-  display: inline-flex;
-  align-items: center;
-}
-
-.math-root-index {
-  font-size: 0.6em;
-  margin-right: -4px;
-  margin-bottom: 6px;
-}
-
-.math-exponent {
-  display: inline-flex;
-  vertical-align: super;
-  font-size: 0.72em;
-  margin-left: 1px;
-}
-
-.math-exponent-power {
-  display: inline-flex;
-  align-items: center;
-}
-
-.math-log-block,
-.math-ln-block {
-  display: inline-flex;
-  align-items: center;
-  margin: 0 1px;
-}
-
-.math-word {
-  font-style: normal;
-  font-family: "Segoe UI", sans-serif;
-  font-size: 0.92em;
-  margin-right: 1px;
-  color: #c6ccc2;
-}
-
-.math-log-base {
-  font-size: 0.6em;
-  vertical-align: sub;
-  margin-right: 1px;
-  display: inline-flex;
-  align-items: center;
-}
-
-.math-log-arg,
-.math-ln-arg {
-  display: inline-flex;
-  align-items: center;
-}
-
-/* Explicit Placeholders */
-.math-slot.empty {
-  display: inline-block;
-  min-width: 16px;
-  min-height: 22px;
-  border: 1px dashed #6b706b;
-  border-radius: 3px;
-  vertical-align: middle;
-  margin: 0 2px;
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.math-slot.empty.focused {
-  border-color: #a4aaa2;
-  background: rgba(255, 255, 255, 0.09);
-}
-
-.math-slot.root-empty {
-  display: inline-flex;
-  align-items: center;
-  width: 100%;
-}
-
-.math-placeholder {
-  color: #555a54;
-  font-size: 0.9em;
-  font-family: "Segoe UI", sans-serif;
-  font-style: italic;
-  pointer-events: none;
-}
-
-/* Synchronous Blinking Cursor */
-.math-cursor {
-  display: inline-block;
-  width: 2px;
-  height: 1.25em;
-  background-color: #ffffff;
-  vertical-align: middle;
-  margin: 0 1px;
-  animation: math-cursor-blink 1s infinite steps(1);
-  pointer-events: none;
-}
-
-@keyframes math-cursor-blink {
-  0%, 49% { opacity: 1; }
-  50%, 100% { opacity: 0; }
 }
 
 @media (max-width: 720px) {

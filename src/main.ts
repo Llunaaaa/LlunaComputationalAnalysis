@@ -1,26 +1,10 @@
 import { invoke } from '@tauri-apps/api/core';
+import { MathfieldElement } from 'mathlive';
+import { latexToEngine } from './latexConverter';
 import './styles.css';
-import {
-  MathNode,
-  parsePlainText,
-  serializeToEngine,
-  stringToAstPath,
-} from './mathAst';
-import {
-  CursorState,
-  insertChar,
-  insertFraction,
-  insertExponent,
-  insertParenthesis,
-  deleteBackward,
-  moveLeft,
-  moveRight,
-  moveUp,
-  moveDown,
-  tabNext,
-  getSlotNodes,
-} from './cursorController';
-import { renderExpression } from './mathRenderer';
+
+// Ensure MathLive finds KaTeX fonts locally from the public directory
+MathfieldElement.fontsDirectory = '/fonts/';
 
 const sections = [
   'Home',
@@ -47,9 +31,9 @@ interface Evaluation {
   error: string | null;
 }
 
-export interface ExpressionRow {
+interface ExpressionRowData {
   id: number;
-  nodes: MathNode[];
+  latex: string;
   evaluation: Evaluation | null;
   evaluating: boolean;
 }
@@ -95,34 +79,21 @@ const page = pageElement;
 let currentSection: Section = 'Home';
 let nextRowId = 3;
 
-// Multi-Row Invariant: ALWAYS at least 2 active expression rows present at all times.
-// There must always be an active, empty, numbered row at the bottom ready for input.
-const rows: ExpressionRow[] = [
-  { id: 1, nodes: parsePlainText('3^(2-6)'), evaluation: null, evaluating: false },
-  { id: 2, nodes: [], evaluation: null, evaluating: false },
+// Multi-Row Invariant: Minimum 2 rows on screen at all times.
+// Trailing Blank Invariant: Bottom row is always empty ready for user input.
+const rows: ExpressionRowData[] = [
+  { id: 1, latex: '3^{2-6}', evaluation: null, evaluating: false },
+  { id: 2, latex: '', evaluation: null, evaluating: false },
 ];
 
-const cursor: CursorState = {
-  activeRowIndex: 1, // Focus the bottom empty row ready for input
-  astPath: [],
-  characterOffset: 0,
-};
-
 function ensureInvariants() {
-  // 1. Minimum 2 rows
   while (rows.length < 2) {
-    rows.push({ id: nextRowId++, nodes: [], evaluation: null, evaluating: false });
+    rows.push({ id: nextRowId++, latex: '', evaluation: null, evaluating: false });
   }
-
-  // 2. Trailing blank row invariant: bottom row must be empty
-  const lastRow = rows[rows.length - 1];
-  if (lastRow.nodes.length > 0) {
-    rows.push({ id: nextRowId++, nodes: [], evaluation: null, evaluating: false });
+  const last = rows[rows.length - 1];
+  if (last.latex.trim().length > 0) {
+    rows.push({ id: nextRowId++, latex: '', evaluation: null, evaluating: false });
   }
-
-  // Clamp activeRowIndex
-  if (cursor.activeRowIndex < 0) cursor.activeRowIndex = 0;
-  if (cursor.activeRowIndex >= rows.length) cursor.activeRowIndex = rows.length - 1;
 }
 
 function renderPage(section: Section) {
@@ -150,251 +121,185 @@ function renderArithmetic() {
   ensureInvariants();
 
   page.innerHTML = `
-    <div class="arithmetic-container" tabindex="0" aria-label="Arithmetic workspace">
+    <div class="arithmetic-container">
       <div class="arithmetic-toolbar">
         <span class="arithmetic-toolbar-title">Arithmetic Workspace</span>
         <button class="add-expression-btn" type="button" id="add-expr-btn">
           <span>+</span> Add expression
         </button>
       </div>
-      <div class="expression-stack" id="expr-stack">
-        ${rows.map((row, idx) => renderRowHtml(row, idx)).join('')}
-      </div>
+      <div class="expression-stack" id="expr-stack"></div>
     </div>
   `;
 
-  attachArithmeticEventListeners();
-  scrollStackToBottom();
-}
+  const stack = page.querySelector<HTMLDivElement>('#expr-stack');
+  if (!stack) return;
 
-function renderRowHtml(row: ExpressionRow, index: number): string {
-  const isFocused = cursor.activeRowIndex === index;
-  const canDelete = rows.length > 2;
+  // Build rows in DOM
+  rows.forEach((row, index) => {
+    const rowEl = createRowElement(row, index);
+    stack.appendChild(rowEl);
+  });
 
-  let resultHtml = '';
-  if (row.evaluating) {
-    resultHtml = 'Evaluating…';
-  } else if (row.evaluation?.error) {
-    resultHtml = `<span class="has-error">Error: ${escapeHtml(row.evaluation.error)}</span>`;
-  } else if (row.evaluation?.value !== null && row.evaluation?.value !== undefined) {
-    const val = row.evaluation.value;
-    const exact = row.evaluation.exact;
-    const formattedVal = Number.isInteger(val) ? String(val) : String(val);
-    if (exact && !isPlainNumber(exact)) {
-      resultHtml = `<span>${escapeHtml(exact)}</span> <span style="color:#727870">≈</span> <span>${formattedVal}</span>`;
-    } else {
-      resultHtml = `= ${formattedVal}`;
-    }
-  }
-
-  return `
-    <article class="expression-row ${isFocused ? 'active' : ''}" data-row-index="${index}">
-      <div class="expression-row-main">
-        <span class="row-number">${index + 1}</span>
-        <div class="expression-editor-area" data-row-index="${index}">
-          ${renderExpression(row.nodes, cursor, isFocused)}
-        </div>
-        <button
-          class="row-delete-btn"
-          type="button"
-          data-delete-row="${index}"
-          title="${canDelete ? 'Delete row' : 'Minimum 2 rows required'}"
-          ${canDelete ? '' : 'disabled'}
-        >×</button>
-      </div>
-      ${resultHtml ? `<div class="expression-row-result">${resultHtml}</div>` : ''}
-    </article>
-  `;
-}
-
-function attachArithmeticEventListeners() {
-  const container = page.querySelector<HTMLDivElement>('.arithmetic-container');
-  if (!container) return;
-
-  // Add expression button
+  // Add expression button handler
   const addBtn = page.querySelector<HTMLButtonElement>('#add-expr-btn');
   addBtn?.addEventListener('click', () => {
     ensureInvariants();
-    // Focus the bottom row
-    cursor.activeRowIndex = rows.length - 1;
-    cursor.astPath = [];
-    cursor.characterOffset = 0;
-    renderArithmetic();
+    syncRowNumbers();
+    const lastRow = rows[rows.length - 1];
+    focusRow(lastRow.id);
+    scrollStackToBottom();
   });
 
-  // Delete buttons
-  const deleteButtons = page.querySelectorAll<HTMLButtonElement>('[data-delete-row]');
-  deleteButtons.forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const rowIdx = parseInt(btn.dataset.deleteRow || '0', 10);
-      deleteRow(rowIdx);
-    });
-  });
-
-  // Click on expression editor areas
-  const editorAreas = page.querySelectorAll<HTMLDivElement>('.expression-editor-area');
-  editorAreas.forEach((area) => {
-    area.addEventListener('mousedown', (e) => {
-      const rowIdx = parseInt(area.dataset.rowIndex || '0', 10);
-      cursor.activeRowIndex = rowIdx;
-
-      const target = e.target as HTMLElement;
-      const slotEl = target.closest<HTMLElement>('[data-path]');
-      if (slotEl && slotEl.dataset.path !== undefined) {
-        cursor.astPath = stringToAstPath(slotEl.dataset.path);
-        const slotNodes = getSlotNodes(rows[rowIdx].nodes, cursor.astPath);
-        cursor.characterOffset = slotNodes.length;
-      } else {
-        cursor.astPath = [];
-        cursor.characterOffset = rows[rowIdx].nodes.length;
-      }
-
-      renderArithmetic();
-      container.focus();
-    });
-  });
-
-  // Keydown event listener on container
-  container.addEventListener('keydown', handleKeydown);
-  container.focus();
+  scrollStackToBottom();
 }
 
-function handleKeydown(e: KeyboardEvent) {
-  const row = rows[cursor.activeRowIndex];
-  if (!row) return;
+function createRowElement(row: ExpressionRowData, index: number): HTMLElement {
+  const article = document.createElement('article');
+  article.className = 'expression-row';
+  article.dataset.rowId = String(row.id);
 
-  // Ignore navigation shortcuts (Ctrl+R, F12, etc.)
-  if (e.ctrlKey || e.altKey || e.metaKey) return;
+  const mainDiv = document.createElement('div');
+  mainDiv.className = 'expression-row-main';
 
-  let prevent = true;
+  // Row number
+  const numSpan = document.createElement('span');
+  numSpan.className = 'row-number';
+  numSpan.textContent = String(index + 1);
+  mainDiv.appendChild(numSpan);
 
-  switch (e.key) {
-    case 'ArrowLeft':
-      moveLeft(row.nodes, cursor);
-      break;
+  // Mathfield element
+  const mf = new MathfieldElement();
+  mf.className = 'expression-mathfield';
+  mf.value = row.latex;
+  mf.mathVirtualKeyboardPolicy = 'manual';
+  mf.smartFence = false;
+  mf.setAttribute('placeholder', 'Type an expression');
+  mf.setAttribute('aria-label', `Expression ${index + 1}`);
 
-    case 'ArrowRight':
-      moveRight(row.nodes, cursor);
-      break;
+  // Delete button
+  const delBtn = document.createElement('button');
+  delBtn.className = 'row-delete-btn';
+  delBtn.type = 'button';
+  delBtn.textContent = '×';
+  delBtn.title = rows.length > 2 ? 'Delete expression' : 'Minimum 2 rows required';
+  delBtn.disabled = rows.length <= 2;
 
-    case 'ArrowUp': {
-      const handled = moveUp(row.nodes, cursor);
-      if (!handled && cursor.activeRowIndex > 0) {
-        cursor.activeRowIndex--;
-        cursor.astPath = [];
-        cursor.characterOffset = rows[cursor.activeRowIndex].nodes.length;
+  delBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    deleteRow(row.id);
+  });
+
+  mainDiv.appendChild(mf);
+  mainDiv.appendChild(delBtn);
+  article.appendChild(mainDiv);
+
+  // Result display
+  const resultDiv = document.createElement('div');
+  resultDiv.className = 'expression-row-result';
+  updateResultElement(resultDiv, row);
+  article.appendChild(resultDiv);
+
+  // Event handlers for Mathfield
+  mf.addEventListener('input', () => {
+    row.latex = mf.value;
+    if (row.evaluation) {
+      row.evaluation = null;
+      updateResultElement(resultDiv, row);
+    }
+
+    // Trailing blank row invariant: if the bottom row now has text, append a new blank row
+    const isBottomRow = rows[rows.length - 1].id === row.id;
+    if (isBottomRow && row.latex.trim().length > 0) {
+      const newBlankRow: ExpressionRowData = {
+        id: nextRowId++,
+        latex: '',
+        evaluation: null,
+        evaluating: false,
+      };
+      rows.push(newBlankRow);
+      const stack = page.querySelector<HTMLDivElement>('#expr-stack');
+      if (stack) {
+        const newRowEl = createRowElement(newBlankRow, rows.length - 1);
+        stack.appendChild(newRowEl);
+        syncRowNumbers();
       }
-      break;
     }
+  });
 
-    case 'ArrowDown': {
-      const handled = moveDown(row.nodes, cursor);
-      if (!handled && cursor.activeRowIndex < rows.length - 1) {
-        cursor.activeRowIndex++;
-        cursor.astPath = [];
-        cursor.characterOffset = rows[cursor.activeRowIndex].nodes.length;
+  mf.addEventListener('keydown', async (e: KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      await evaluateRow(row, resultDiv);
+
+      // Move focus down to next row if available
+      const currentRowIdx = rows.findIndex((r) => r.id === row.id);
+      if (currentRowIdx >= 0 && currentRowIdx < rows.length - 1) {
+        focusRow(rows[currentRowIdx + 1].id);
       }
-      break;
     }
+  });
 
-    case 'Tab': {
-      const handled = tabNext(row.nodes, cursor);
-      if (!handled) {
-        if (cursor.activeRowIndex < rows.length - 1) {
-          cursor.activeRowIndex++;
-          cursor.astPath = [];
-          cursor.characterOffset = 0;
-        }
-      }
-      break;
+  // Vertical arrow key navigation across rows
+  mf.addEventListener('move-out', (e: Event) => {
+    const customEvent = e as CustomEvent<{ direction: 'upward' | 'downward' | 'forward' | 'backward' }>;
+    const dir = customEvent.detail?.direction;
+    const currentRowIdx = rows.findIndex((r) => r.id === row.id);
+
+    if (dir === 'upward' && currentRowIdx > 0) {
+      focusRow(rows[currentRowIdx - 1].id);
+    } else if (dir === 'downward' && currentRowIdx < rows.length - 1) {
+      focusRow(rows[currentRowIdx + 1].id);
     }
+  });
 
-    case 'Backspace':
-      deleteBackward(row.nodes, cursor, () => {
-        deleteRow(cursor.activeRowIndex);
-      });
-      break;
-
-    case 'Enter': {
-      // If inside log base and base is empty, jump to argument
-      if (cursor.astPath.length > 0) {
-        const lastStep = cursor.astPath[cursor.astPath.length - 1];
-        if (lastStep.slot === 'base') {
-          const slot = getSlotNodes(row.nodes, cursor.astPath);
-          if (slot.length === 0) {
-            cursor.astPath[cursor.astPath.length - 1] = {
-              nodeIndex: lastStep.nodeIndex,
-              slot: 'argument',
-            };
-            cursor.characterOffset = 0;
-            break;
-          }
-        }
-      }
-      evaluateCurrentRow();
-      break;
-    }
-
-    case '/': {
-      // Stacked fraction (never inline division)
-      insertFraction(row.nodes, cursor);
-      break;
-    }
-
-    case '^': {
-      insertExponent(row.nodes, cursor);
-      break;
-    }
-
-    case '(': {
-      insertParenthesis(row.nodes, cursor, '(');
-      break;
-    }
-
-    case ')': {
-      insertParenthesis(row.nodes, cursor, ')');
-      break;
-    }
-
-    case '!': {
-      insertChar(row.nodes, cursor, '!');
-      break;
-    }
-
-    default: {
-      if (e.key.length === 1) {
-        insertChar(row.nodes, cursor, e.key);
-      } else {
-        prevent = false;
-      }
-      break;
-    }
-  }
-
-  if (prevent) {
-    e.preventDefault();
-    ensureInvariants();
-    renderArithmetic();
-  }
+  return article;
 }
 
-async function evaluateCurrentRow() {
-  const row = rows[cursor.activeRowIndex];
-  if (!row) return;
+function updateResultElement(el: HTMLElement, row: ExpressionRowData) {
+  if (row.evaluating) {
+    el.textContent = 'Evaluating…';
+    el.className = 'expression-row-result';
+    return;
+  }
 
-  const expressionStr = serializeToEngine(row.nodes);
-  if (!expressionStr.trim()) {
+  if (row.evaluation?.error) {
+    el.innerHTML = `<span class="has-error">Error: ${escapeHtml(row.evaluation.error)}</span>`;
+    el.className = 'expression-row-result has-error';
+    return;
+  }
+
+  if (row.evaluation?.value !== null && row.evaluation?.value !== undefined) {
+    const val = row.evaluation.value;
+    const exact = row.evaluation.exact;
+    const formattedVal = Number.isInteger(val) ? String(val) : String(val);
+
+    if (exact && !isPlainNumber(exact)) {
+      el.innerHTML = `<span>${escapeHtml(exact)}</span> <span style="color:#727870">≈</span> <span>${formattedVal}</span>`;
+    } else {
+      el.textContent = `= ${formattedVal}`;
+    }
+    el.className = 'expression-row-result';
+    return;
+  }
+
+  el.textContent = '';
+  el.className = 'expression-row-result';
+}
+
+async function evaluateRow(row: ExpressionRowData, resultEl: HTMLElement) {
+  const engineExpr = latexToEngine(row.latex);
+  if (!engineExpr.trim()) {
     row.evaluation = { value: null, exact: null, error: 'Enter an expression' };
-    renderArithmetic();
+    updateResultElement(resultEl, row);
     return;
   }
 
   row.evaluating = true;
-  renderArithmetic();
+  updateResultElement(resultEl, row);
 
   try {
-    row.evaluation = await invoke<Evaluation>('evaluate', { expression: expressionStr });
+    row.evaluation = await invoke<Evaluation>('evaluate', { expression: engineExpr });
   } catch (err) {
     row.evaluation = {
       value: null,
@@ -403,33 +308,52 @@ async function evaluateCurrentRow() {
     };
   } finally {
     row.evaluating = false;
-
-    // After evaluating: if current row is at the bottom, ensure next blank row and move to it
-    ensureInvariants();
-    if (cursor.activeRowIndex < rows.length - 1) {
-      cursor.activeRowIndex++;
-      cursor.astPath = [];
-      cursor.characterOffset = 0;
-    }
-    renderArithmetic();
+    updateResultElement(resultEl, row);
   }
 }
 
-function deleteRow(index: number) {
-  // Multi-Row Invariant: block/prevent row deletion if only 2 rows remain
+function deleteRow(rowId: number) {
+  // Deletion rule: Block deletion if only 2 rows remain
   if (rows.length <= 2) return;
 
-  rows.splice(index, 1);
-  if (cursor.activeRowIndex >= rows.length) {
-    cursor.activeRowIndex = rows.length - 1;
-  } else if (cursor.activeRowIndex === index) {
-    cursor.activeRowIndex = Math.max(0, index - 1);
-  }
-  cursor.astPath = [];
-  cursor.characterOffset = 0;
+  const index = rows.findIndex((r) => r.id === rowId);
+  if (index === -1) return;
 
+  rows.splice(index, 1);
   ensureInvariants();
-  renderArithmetic();
+
+  // Remove element from DOM
+  const rowEl = page.querySelector<HTMLElement>(`.expression-row[data-row-id="${rowId}"]`);
+  rowEl?.remove();
+
+  syncRowNumbers();
+}
+
+function syncRowNumbers() {
+  const stack = page.querySelector<HTMLDivElement>('#expr-stack');
+  if (!stack) return;
+
+  const rowEls = stack.querySelectorAll<HTMLElement>('.expression-row');
+  rowEls.forEach((el, index) => {
+    const numEl = el.querySelector<HTMLElement>('.row-number');
+    if (numEl) numEl.textContent = String(index + 1);
+
+    const delBtn = el.querySelector<HTMLButtonElement>('.row-delete-btn');
+    if (delBtn) {
+      delBtn.disabled = rows.length <= 2;
+      delBtn.title = rows.length > 2 ? 'Delete expression' : 'Minimum 2 rows required';
+    }
+  });
+}
+
+function focusRow(rowId: number) {
+  const rowEl = page.querySelector<HTMLElement>(`.expression-row[data-row-id="${rowId}"]`);
+  const mf = rowEl?.querySelector<MathfieldElement>('.expression-mathfield');
+  if (mf) {
+    requestAnimationFrame(() => {
+      mf.focus();
+    });
+  }
 }
 
 function scrollStackToBottom() {
@@ -468,17 +392,19 @@ for (const button of sectionButtons) {
   });
 }
 
-// Pre-evaluate the initial row
+// Pre-evaluate the initial row on launch
 async function initInitialRow() {
-  if (rows[0] && rows[0].nodes.length > 0) {
+  if (rows[0] && rows[0].latex.trim()) {
     try {
-      const expr = serializeToEngine(rows[0].nodes);
+      const expr = latexToEngine(rows[0].latex);
       rows[0].evaluation = await invoke<Evaluation>('evaluate', { expression: expr });
       if (currentSection === 'Arithmetic') {
-        renderArithmetic();
+        const rowEl = page.querySelector<HTMLElement>(`.expression-row[data-row-id="${rows[0].id}"]`);
+        const resEl = rowEl?.querySelector<HTMLElement>('.expression-row-result');
+        if (resEl) updateResultElement(resEl, rows[0]);
       }
     } catch {
-      // Ignored during startup if engine not yet ready
+      // Ignored during startup
     }
   }
 }
