@@ -10,6 +10,7 @@ typedef struct MathResult {
     double value;
     char error_message[256];
     char exact_value[256];
+    char display_value[256];
 } MathResult;
 
 MathResult evaluate_expression(const char* expression);

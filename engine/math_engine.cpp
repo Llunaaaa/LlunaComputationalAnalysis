@@ -33,8 +33,10 @@ extern "C" MathResult evaluate_expression(const char* expression) {
         MathResult result{};
         result.error_code = 0;
         result.is_approximate = eval_res.is_approximate ? 1 : 0;
-        result.value = eval_res.value;
+        result.value = eval_res.to_double();
         std::strncpy(result.exact_value, eval_res.exact_repr.c_str(), sizeof(result.exact_value) - 1);
+        std::string disp = eval_res.format();
+        std::strncpy(result.display_value, disp.c_str(), sizeof(result.display_value) - 1);
         return result;
     } catch (const std::exception& error) {
         MathResult result{};

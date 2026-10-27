@@ -28,6 +28,12 @@ void assert_approximate(const char* expression, int expected_approx) {
     assert(result.is_approximate == expected_approx);
 }
 
+void assert_display_prefix(const char* expression, const char* prefix) {
+    const MathResult result = evaluate_expression(expression);
+    assert(result.error_code == 0);
+    assert(std::strncmp(result.display_value, prefix, std::strlen(prefix)) == 0);
+}
+
 int main() {
     assert_value("2 + 3 * 4", 14.0);
     assert_value("(2 + 3) * 4", 20.0);
@@ -42,6 +48,12 @@ int main() {
     assert_value("5!", 120.0);
     assert_value("0!", 1.0);
     assert_value("1!", 1.0);
+    assert_display_prefix("170!", "7.257415");
+    assert_display_prefix("171!", "1.241018");
+    assert_display_prefix("200!", "7.886578");
+    assert_display_prefix("1000!", "4.023872");
+    assert_error("9.5!", "Factorial of a non-integer requires the gamma function");
+    assert_error("(-3)!", "Cannot take factorial of a negative value");
     assert_value("2sqrt(2)", 2.0 * std::sqrt(2.0));
     assert_value("2pi", 2.0 * (4.0 * std::atan(1.0)));
     assert_value("2(3+4)", 14.0);

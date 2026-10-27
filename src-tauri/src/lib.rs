@@ -7,6 +7,7 @@ struct NativeMathResult {
     value: f64,
     error_message: [u8; 256],
     exact_value: [u8; 256],
+    display_value: [u8; 256],
 }
 
 unsafe extern "C" {
@@ -17,6 +18,7 @@ unsafe extern "C" {
 struct Evaluation {
     value: Option<f64>,
     exact: Option<String>,
+    display_value: Option<String>,
     is_approximate: bool,
     error: Option<String>,
 }
@@ -29,8 +31,9 @@ fn evaluate(expression: String) -> Result<Evaluation, String> {
     let result = unsafe { evaluate_expression(expression.as_ptr()) };
     if result.error_code == 0 {
         return Ok(Evaluation {
-            value: Some(result.value),
+            value: if result.value.is_finite() { Some(result.value) } else { None },
             exact: read_message(&result.exact_value),
+            display_value: read_message(&result.display_value),
             is_approximate: result.is_approximate != 0,
             error: None,
         });
@@ -45,6 +48,7 @@ fn evaluate(expression: String) -> Result<Evaluation, String> {
     Ok(Evaluation {
         value: None,
         exact: None,
+        display_value: None,
         is_approximate: false,
         error: Some(message),
     })
@@ -84,10 +88,10 @@ mod tests {
     }
 
     #[test]
-    fn evaluates_irrational_as_approximation() {
-        let result = evaluate("sqrt(2)".to_owned()).expect("evaluation should succeed");
-        assert!(result.value.is_some());
-        assert_eq!(result.is_approximate, true);
+    fn evaluates_large_factorial_beyond_170() {
+        let result = evaluate("171!".to_owned()).expect("evaluation should succeed");
+        assert!(result.display_value.is_some());
+        assert!(result.display_value.unwrap().starts_with("1.241018"));
         assert_eq!(result.error, None);
     }
 

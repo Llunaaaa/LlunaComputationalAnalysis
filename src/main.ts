@@ -28,6 +28,7 @@ type Section = (typeof sections)[number];
 interface Evaluation {
   value: number | null;
   exact: string | null;
+  display_value: string | null;
   is_approximate: boolean;
   error: string | null;
 }
@@ -292,14 +293,18 @@ function updateResultElement(el: HTMLElement, row: ExpressionRowData) {
     return;
   }
 
-  if (row.evaluation?.value !== null && row.evaluation?.value !== undefined) {
-    const val = row.evaluation.value;
-    const formattedVal = Number.isInteger(val) ? String(val) : String(val);
-    const symbol = row.evaluation.is_approximate ? '≈' : '=';
+  if (row.evaluation) {
+    const formattedVal = row.evaluation.display_value ??
+      (row.evaluation.value !== null && row.evaluation.value !== undefined
+        ? (Number.isInteger(row.evaluation.value) ? String(row.evaluation.value) : String(row.evaluation.value))
+        : '');
 
-    el.textContent = `${symbol} ${formattedVal}`;
-    el.className = 'expression-row-result';
-    return;
+    if (formattedVal) {
+      const symbol = row.evaluation.is_approximate ? '≈' : '=';
+      el.textContent = `${symbol} ${formattedVal}`;
+      el.className = 'expression-row-result';
+      return;
+    }
   }
 
   el.textContent = '';
@@ -309,7 +314,7 @@ function updateResultElement(el: HTMLElement, row: ExpressionRowData) {
 async function evaluateRow(row: ExpressionRowData, resultEl: HTMLElement) {
   const engineExpr = latexToEngine(row.latex);
   if (!engineExpr.trim()) {
-    row.evaluation = { value: null, exact: null, is_approximate: false, error: 'Enter an expression' };
+    row.evaluation = { value: null, exact: null, display_value: null, is_approximate: false, error: 'Enter an expression' };
     updateResultElement(resultEl, row);
     return;
   }
@@ -323,6 +328,7 @@ async function evaluateRow(row: ExpressionRowData, resultEl: HTMLElement) {
     row.evaluation = {
       value: null,
       exact: null,
+      display_value: null,
       is_approximate: false,
       error: err instanceof Error ? err.message : 'Evaluation failed',
     };
