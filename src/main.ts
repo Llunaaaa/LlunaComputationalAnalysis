@@ -145,14 +145,51 @@ function renderArithmetic() {
   // Add expression button handler
   const addBtn = page.querySelector<HTMLButtonElement>('#add-expr-btn');
   addBtn?.addEventListener('click', () => {
-    ensureInvariants();
+    const newBlankRow: ExpressionRowData = {
+      id: nextRowId++,
+      latex: '',
+      evaluation: null,
+      evaluating: false,
+    };
+    rows.push(newBlankRow);
+    const newRowEl = createRowElement(newBlankRow, rows.length - 1);
+    stack.appendChild(newRowEl);
     syncRowNumbers();
-    const lastRow = rows[rows.length - 1];
-    focusRow(lastRow.id);
+    focusRow(newBlankRow.id);
     scrollStackToBottom();
   });
 
   scrollStackToBottom();
+}
+
+function ensureTrailingBlankRow() {
+  const stack = page.querySelector<HTMLDivElement>('#expr-stack');
+  if (!stack) return;
+
+  while (rows.length < 2) {
+    const newRow: ExpressionRowData = {
+      id: nextRowId++,
+      latex: '',
+      evaluation: null,
+      evaluating: false,
+    };
+    rows.push(newRow);
+    stack.appendChild(createRowElement(newRow, rows.length - 1));
+  }
+
+  const last = rows[rows.length - 1];
+  if (last.latex.trim().length > 0) {
+    const newBlankRow: ExpressionRowData = {
+      id: nextRowId++,
+      latex: '',
+      evaluation: null,
+      evaluating: false,
+    };
+    rows.push(newBlankRow);
+    stack.appendChild(createRowElement(newBlankRow, rows.length - 1));
+  }
+
+  syncRowNumbers();
 }
 
 function createRowElement(row: ExpressionRowData, index: number): HTMLElement {
@@ -207,24 +244,7 @@ function createRowElement(row: ExpressionRowData, index: number): HTMLElement {
       row.evaluation = null;
       updateResultElement(resultDiv, row);
     }
-
-    // Trailing blank row invariant: if the bottom row now has text, append a new blank row
-    const isBottomRow = rows[rows.length - 1].id === row.id;
-    if (isBottomRow && row.latex.trim().length > 0) {
-      const newBlankRow: ExpressionRowData = {
-        id: nextRowId++,
-        latex: '',
-        evaluation: null,
-        evaluating: false,
-      };
-      rows.push(newBlankRow);
-      const stack = page.querySelector<HTMLDivElement>('#expr-stack');
-      if (stack) {
-        const newRowEl = createRowElement(newBlankRow, rows.length - 1);
-        stack.appendChild(newRowEl);
-        syncRowNumbers();
-      }
-    }
+    ensureTrailingBlankRow();
   });
 
   mf.addEventListener('keydown', async (e: KeyboardEvent) => {
@@ -232,11 +252,14 @@ function createRowElement(row: ExpressionRowData, index: number): HTMLElement {
       e.preventDefault();
       await evaluateRow(row, resultDiv);
 
+      ensureTrailingBlankRow();
+
       // Move focus down to next row if available
       const currentRowIdx = rows.findIndex((r) => r.id === row.id);
       if (currentRowIdx >= 0 && currentRowIdx < rows.length - 1) {
         focusRow(rows[currentRowIdx + 1].id);
       }
+      scrollStackToBottom();
     }
   });
 
@@ -317,12 +340,12 @@ function deleteRow(rowId: number) {
   if (index === -1) return;
 
   rows.splice(index, 1);
-  ensureInvariants();
 
   // Remove element from DOM
   const rowEl = page.querySelector<HTMLElement>(`.expression-row[data-row-id="${rowId}"]`);
   rowEl?.remove();
 
+  ensureTrailingBlankRow();
   syncRowNumbers();
 }
 

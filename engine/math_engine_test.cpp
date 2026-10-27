@@ -42,6 +42,11 @@ int main() {
     assert_value("5!", 120.0);
     assert_value("0!", 1.0);
     assert_value("1!", 1.0);
+    assert_value("2sqrt(2)", 2.0 * std::sqrt(2.0));
+    assert_value("2pi", 2.0 * (4.0 * std::atan(1.0)));
+    assert_value("2(3+4)", 14.0);
+    assert_value("(2)(3)", 6.0);
+    assert_value("3e", 3.0 * std::exp(1.0));
     assert_value("log(100)", 2.0);
     assert_value("log(2)(8)", 3.0);
     assert_value("ln(e)", 1.0);
