@@ -19,13 +19,15 @@ public:
 
 class NumberNode : public AstNode {
 public:
-    explicit NumberNode(double value) : value_(value) {}
+    explicit NumberNode(std::string text, double value)
+        : text_(std::move(text)), value_(value) {}
 
     NumberValue evaluate() const override {
-        return NumberValue(value_, false, "");
+        return NumberValue::from_literal(text_, value_);
     }
 
 private:
+    std::string text_;
     double value_;
 };
 

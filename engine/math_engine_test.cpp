@@ -42,6 +42,13 @@ int main() {
     assert_value("-3^2", -9.0);
     assert_value("(-3)^2", 9.0);
     assert_value("0.5 + .25", 0.75);
+    assert_approximate("0.5 + .25", 0);
+    assert_value("0.5 + 0.5", 1.0);
+    assert_approximate("0.5 + 0.5", 0);
+    assert_value("0.25 * 4", 1.0);
+    assert_approximate("0.25 * 4", 0);
+    assert_value("1.5 * 2", 3.0);
+    assert_approximate("1.5 * 2", 0);
     assert_value("sqrt(16)", 4.0);
     assert_value("root(3)(27)", 3.0);
     assert_value("root(3)(-8)", -2.0);

@@ -111,7 +111,42 @@ public:
     NumberValue() : kind(ValueKind::ExactRational), rat(0) {}
     NumberValue(int n) : kind(ValueKind::ExactRational), rat(static_cast<long long>(n)) {}
     NumberValue(long long n) : kind(ValueKind::ExactRational), rat(n) {}
-    NumberValue(Rational r) : kind(ValueKind::ExactRational), rat(r) {}
+    NumberValue(Rational r) : kind(ValueKind::ExactRational), rat(r) {
+        if (!rat.is_integer()) {
+            exact_repr = std::to_string(rat.num) + "/" + std::to_string(rat.den);
+        }
+    }
+
+    static NumberValue from_literal(const std::string& text, double fallback_val) {
+        if (text.find('e') != std::string::npos || text.find('E') != std::string::npos) {
+            return NumberValue(fallback_val);
+        }
+        size_t dot_pos = text.find('.');
+        if (dot_pos == std::string::npos) {
+            try {
+                long long val = std::stoll(text);
+                return NumberValue(val);
+            } catch (...) {
+                return NumberValue(fallback_val);
+            }
+        }
+        std::string int_part = text.substr(0, dot_pos);
+        std::string frac_part = text.substr(dot_pos + 1);
+        if (frac_part.size() <= 15 && text.size() <= 18) {
+            try {
+                int k = static_cast<int>(frac_part.size());
+                long long den = 1;
+                for (int i = 0; i < k; ++i) den *= 10;
+                long long whole = int_part.empty() ? 0 : std::stoll(int_part);
+                long long frac = frac_part.empty() ? 0 : std::stoll(frac_part);
+                long long num = (whole >= 0) ? (whole * den + frac) : (whole * den - frac);
+                return NumberValue(Rational(num, den));
+            } catch (...) {
+                return NumberValue(fallback_val);
+            }
+        }
+        return NumberValue(fallback_val);
+    }
 
     NumberValue(double val, bool approx = false, const std::string& exact = "") {
         if (!std::isfinite(val)) throw std::runtime_error("The result is not finite");

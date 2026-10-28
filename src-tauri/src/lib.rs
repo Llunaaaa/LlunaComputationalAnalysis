@@ -85,6 +85,10 @@ mod tests {
         assert_eq!(result.value, Some(14.0));
         assert_eq!(result.is_approximate, false);
         assert_eq!(result.error, None);
+
+        let dec = evaluate("0.5 + 0.5".to_owned()).expect("evaluation should succeed");
+        assert_eq!(dec.value, Some(1.0));
+        assert_eq!(dec.is_approximate, false);
     }
 
     #[test]

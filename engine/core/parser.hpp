@@ -104,7 +104,7 @@ private:
 
     std::unique_ptr<AstNode> parse_primary() {
         if (match(TokenType::Number)) {
-            return std::make_unique<NumberNode>(previous().number_value);
+            return std::make_unique<NumberNode>(previous().text, previous().number_value);
         }
 
         if (match(TokenType::LParen)) {
