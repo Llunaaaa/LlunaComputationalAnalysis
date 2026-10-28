@@ -222,6 +222,8 @@ function createRowElement(row: ExpressionRowData, index: number): HTMLElement {
         ...mf.inlineShortcuts,
         root: '\\sqrt[#?]{#?}',
         nthroot: '\\sqrt[#?]{#?}',
+        sum: '\\sum_{#?}^{#?}',
+        prod: '\\prod_{#?}^{#?}',
       };
     } catch {
       // Ignore if already configured
