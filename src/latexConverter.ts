@@ -16,13 +16,25 @@ function extractBraced(str: string, pos: number): { content: string; nextPos: nu
   return null;
 }
 
-function parseLatexSumProd(latex: string): string {
+/**
+ * Converts MathLive LaTeX output into the mathematical syntax expected by the C++ engine.
+ */
+export function latexToEngine(latex: string): string {
+  if (!latex || !latex.trim()) return '';
+
   let s = latex.trim();
 
-  // 1. Check for infinite bounds
-  if (/\\(?:sum|prod)[^}]*(?:\\infty|oo|\binfty\b)/i.test(s) || /\\infty/.test(s)) {
+  // If there are unpopulated placeholders, prompt clearly
+  if (/\\placeholder\{\}/.test(s) || /\\placeholder\b/.test(s)) {
+    throw new Error('Please fill in all placeholders in the expression');
+  }
+
+  // 1. Check for infinite bounds in summation or product
+  if (/\\(?:sum|prod)/.test(s) && (/\\infty/.test(s) || /\\operatorname\{oo\}/i.test(s) || /\boo\b/i.test(s))) {
     throw new Error('Infinite bounds are not supported');
   }
+
+  const savedSumProd: { op: string; varName: string; lowerBound: string; upperBound: string; body: string }[] = [];
 
   let changed = true;
   while (changed) {
@@ -129,29 +141,40 @@ function parseLatexSumProd(latex: string): string {
       lowerBound = lowerRaw.slice(eqIdx + 1).trim();
     }
 
-    if (!bodyRaw) bodyRaw = '0';
+    if (!bodyRaw) throw new Error(`${op === 'sum' ? 'Summation' : 'Product'} requires a target expression to evaluate`);
+    if (!lowerBound || !upperRaw) throw new Error(`${op === 'sum' ? 'Summation' : 'Product'} requires lower and upper bounds`);
 
-    const replacement = `${op}(${varName}, ${latexToEngine(lowerBound)}, ${latexToEngine(upperRaw)}, ${latexToEngine(bodyRaw)})`;
-    s = s.slice(0, opIndex) + replacement + s.slice(endPos);
+    const id = savedSumProd.length;
+    const placeholder = `ZOPZ${id}Z`;
+    savedSumProd.push({
+      op,
+      varName,
+      lowerBound: latexToEngine(lowerBound),
+      upperBound: latexToEngine(upperRaw),
+      body: latexToEngine(bodyRaw),
+    });
+
+    s = s.slice(0, opIndex) + placeholder + s.slice(endPos);
     changed = true;
   }
-
-  return s;
-}
-
-/**
- * Converts MathLive LaTeX output into the mathematical syntax expected by the C++ engine.
- */
-export function latexToEngine(latex: string): string {
-  if (!latex || !latex.trim()) return '';
-
-  let s = parseLatexSumProd(latex.trim());
 
   s = s.replace(/\\binom\s*\{([^{}]+)\}\s*\{([^{}]+)\}/g, 'nCr($1, $2)');
   s = s.replace(/\\(?:b|p)?mod\s*\{([^{}]+)\}/g, 'mod($1)');
   s = s.replace(/\\(?:b|p)?mod\s+([0-9a-zA-Z]+)/g, ', $1)');
 
   let expr = convertLatexToAsciiMath(s);
+
+  // Restore saved sum and prod safely without MathLive letter-spacing
+  for (let i = 0; i < savedSumProd.length; i++) {
+    const item = savedSumProd[i];
+    const phRegex = new RegExp(`Z\\s*O\\s*P\\s*Z\\s*${i}\\s*Z`, 'g');
+    const replacement = `${item.op}(${item.varName}, ${item.lowerBound}, ${item.upperBound}, ${item.body})`;
+    expr = expr.replace(phRegex, replacement);
+  }
+
+  // Extra safety fallback
+  expr = expr.replace(/s\s*u\s*m\s*\(/gi, 'sum(');
+  expr = expr.replace(/p\s*r\s*o\s*d\s*\(/gi, 'prod(');
 
   // Normalize MathLive log output
   // e.g. log _2(8) -> log(2)(8), log _{10}(100) -> log(10)(100)
