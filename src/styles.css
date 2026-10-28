@@ -342,22 +342,33 @@ math-field,
 }
 
 .fraction-toggle-btn {
-  margin-left: 6px;
-  background: #181c18;
-  border: 1px solid #363b36;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  padding: 0 7px;
+  background: transparent;
+  border: 1px solid #5898ff;
   border-radius: 4px;
-  color: #9ea49d;
+  color: #5898ff;
   font-family: "Cascadia Mono", Consolas, monospace;
   font-size: 0.72rem;
-  padding: 1px 6px;
+  font-weight: 600;
   cursor: pointer;
+  line-height: 1;
+  user-select: none;
   transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
 }
 
 .fraction-toggle-btn:hover {
-  background: #252a25;
-  color: #ffffff;
-  border-color: #555d54;
+  background: rgba(88, 152, 255, 0.15);
+  color: #8bb6ff;
+  border-color: #8bb6ff;
+}
+
+.fraction-toggle-btn.active {
+  background: #5898ff;
+  color: #0b0d0b;
 }
 
 @media (max-width: 720px) {

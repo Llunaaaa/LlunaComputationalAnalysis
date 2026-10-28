@@ -6,7 +6,36 @@ import { convertLatexToAsciiMath } from 'mathlive';
 export function latexToEngine(latex: string): string {
   if (!latex || !latex.trim()) return '';
 
-  let s = latex;
+  let s = latex.trim();
+
+  // Check for infinity in summation or product
+  if (/\\(?:sum|prod)/.test(s) && (/\\infty/.test(s) || /\\operatorname\{oo\}/i.test(s) || /\boo\b/i.test(s))) {
+    throw new Error('Infinite bounds are not supported');
+  }
+
+  // Handle \sum_{i=1}^{5} body or \prod_{i=1}^{5} body
+  const sumRegex1 = /\\(sum|prod)_\{([a-zA-Z])\s*=\s*([^{}]+)\}\^\{([^{}]+)\}\s*(.*)/;
+  const sumRegex2 = /\\(sum|prod)\^\{([^{}]+)\}_\{([a-zA-Z])\s*=\s*([^{}]+)\}\s*(.*)/;
+  const sumRegexNoVar1 = /\\(sum|prod)_\{([^{}]+)\}\^\{([^{}]+)\}\s*(.*)/;
+  const sumRegexNoVar2 = /\\(sum|prod)\^\{([^{}]+)\}_\{([^{}]+)\}\s*(.*)/;
+
+  let m = s.match(sumRegex1);
+  if (m) {
+    return `${m[1]}(${m[2]}, ${latexToEngine(m[3])}, ${latexToEngine(m[4])}, ${latexToEngine(m[5])})`;
+  }
+  m = s.match(sumRegex2);
+  if (m) {
+    return `${m[1]}(${m[3]}, ${latexToEngine(m[4])}, ${latexToEngine(m[2])}, ${latexToEngine(m[5])})`;
+  }
+  m = s.match(sumRegexNoVar1);
+  if (m) {
+    return `${m[1]}(i, ${latexToEngine(m[2])}, ${latexToEngine(m[3])}, ${latexToEngine(m[4])})`;
+  }
+  m = s.match(sumRegexNoVar2);
+  if (m) {
+    return `${m[1]}(i, ${latexToEngine(m[3])}, ${latexToEngine(m[2])}, ${latexToEngine(m[4])})`;
+  }
+
   s = s.replace(/\\binom\s*\{([^{}]+)\}\s*\{([^{}]+)\}/g, 'nCr($1, $2)');
   s = s.replace(/\\(?:b|p)?mod\s*\{([^{}]+)\}/g, 'mod($1)');
   s = s.replace(/\\(?:b|p)?mod\s+([0-9a-zA-Z]+)/g, ', $1)');

@@ -126,6 +126,27 @@ private:
         if (match(TokenType::Identifier)) {
             std::string name = previous().text;
 
+            // Check for summation or product: sum(i, a, b, body) or prod(i, a, b, body)
+            if (name == "sum" || name == "prod") {
+                consume(TokenType::LParen, name + " requires arguments in parentheses");
+                // 1. Variable name (identifier)
+                consume(TokenType::Identifier, name + " requires an index variable");
+                std::string var_name = previous().text;
+                consume(TokenType::Comma, "Expected ',' after variable name in " + name);
+                // 2. Lower bound
+                auto lower = parse_expression();
+                consume(TokenType::Comma, "Expected ',' after lower bound in " + name);
+                // 3. Upper bound
+                auto upper = parse_expression();
+                consume(TokenType::Comma, "Expected ',' after upper bound in " + name);
+                // 4. Target expression / body
+                auto body = parse_expression();
+                consume(TokenType::RParen, "Missing closing parenthesis in " + name);
+
+                IterationNode::Kind k = (name == "sum") ? IterationNode::Kind::Sum : IterationNode::Kind::Product;
+                return std::make_unique<IterationNode>(k, var_name, std::move(lower), std::move(upper), std::move(body));
+            }
+
             // Check if it's a known mathematical constant
             const auto* c = constants::find_constant(name);
             if (c) {
@@ -137,7 +158,8 @@ private:
                 return parse_function_call(name);
             }
 
-            throw std::runtime_error("Unknown identifier: " + name);
+            // Otherwise it's a variable reference (e.g. 'i' in sum loop)
+            return std::make_unique<VariableNode>(name);
         }
 
         throw std::runtime_error("Expected a number");

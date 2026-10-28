@@ -165,6 +165,23 @@ int main() {
     assert_approximate("phi", 1);
     assert_value("phi", (1.0 + std::sqrt(5.0)) / 2.0);
 
+    // Capital Sigma (Sum) and Capital Pi (Prod) tests
+    assert_value("sum(i, 1, 5, i)", 15.0);
+    assert_approximate("sum(i, 1, 5, i)", 0);
+    assert_value("sum(i, 1, 5, i^2)", 55.0);
+    assert_approximate("sum(i, 1, 5, i^2)", 0);
+    assert_value("sum(k, 0, 4, 2k+1)", 25.0);
+    assert_approximate("sum(k, 0, 4, 2k+1)", 0);
+    assert_value("prod(i, 1, 5, i)", 120.0);
+    assert_approximate("prod(i, 1, 5, i)", 0);
+    assert_value("prod(i, 1, 4, i+1)", 120.0);
+    assert_approximate("prod(i, 1, 4, i+1)", 0);
+    assert_error("sum(i, 5, 2, i)", "Lower bound cannot be greater than upper bound");
+    assert_error("sum(i, 1.5, 5, i)", "Lower bound must be an integer");
+    assert_error("sum(i, 1, 5.5, i)", "Upper bound must be an integer");
+    assert_error("sum(i, 1, oo, i)", "Infinite bounds are not supported");
+    assert_error("prod(i, 1, inf, i)", "Infinite bounds are not supported");
+
     assert_approximate("sqrt(2)", 1);
     assert_approximate("sqrt(16)", 0);
     assert_approximate("pi", 1);

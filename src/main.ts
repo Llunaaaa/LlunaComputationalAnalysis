@@ -242,6 +242,22 @@ function createRowElement(row: ExpressionRowData, index: number): HTMLElement {
   });
 
   mainDiv.appendChild(mf);
+
+  // Fraction toggle button [a/b] positioned to the right of math-field (which ends with the 3 blue lines)
+  const fracBtn = document.createElement('button');
+  fracBtn.className = 'fraction-toggle-btn';
+  fracBtn.type = 'button';
+  fracBtn.textContent = 'a/b';
+  fracBtn.title = 'Toggle exact fraction / decimal';
+  fracBtn.style.display = 'none';
+
+  fracBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    row.showExactFraction = !row.showExactFraction;
+    updateResultElement(resultDiv, row);
+  });
+  mainDiv.appendChild(fracBtn);
+
   mainDiv.appendChild(delBtn);
   article.appendChild(mainDiv);
 
@@ -294,6 +310,21 @@ function createRowElement(row: ExpressionRowData, index: number): HTMLElement {
 }
 
 function updateResultElement(el: HTMLElement, row: ExpressionRowData) {
+  const article = el.closest('.expression-row');
+  const fracBtn = article?.querySelector<HTMLButtonElement>('.fraction-toggle-btn');
+
+  const hasExactFraction = Boolean(
+    row.evaluation &&
+    row.evaluation.exact &&
+    row.evaluation.exact.includes('/') &&
+    !row.evaluation.is_approximate
+  );
+
+  if (fracBtn) {
+    fracBtn.style.display = hasExactFraction ? 'inline-flex' : 'none';
+    fracBtn.classList.toggle('active', Boolean(row.showExactFraction));
+  }
+
   if (row.evaluating) {
     el.textContent = 'Evaluating…';
     el.className = 'expression-row-result';
@@ -307,12 +338,6 @@ function updateResultElement(el: HTMLElement, row: ExpressionRowData) {
   }
 
   if (row.evaluation) {
-    const hasExactFraction = Boolean(
-      row.evaluation.exact &&
-      row.evaluation.exact.includes('/') &&
-      !row.evaluation.is_approximate
-    );
-
     let formattedVal = row.evaluation.display_value ??
       (row.evaluation.value !== null && row.evaluation.value !== undefined
         ? (Number.isInteger(row.evaluation.value) ? String(row.evaluation.value) : String(row.evaluation.value))
@@ -324,19 +349,8 @@ function updateResultElement(el: HTMLElement, row: ExpressionRowData) {
 
     if (formattedVal) {
       const symbol = row.evaluation.is_approximate ? '≈' : '=';
-      let html = `<span>${symbol} ${escapeHtml(formattedVal)}</span>`;
-      if (hasExactFraction) {
-        html += ` <button class="fraction-toggle-btn" type="button" title="Toggle exact fraction / decimal">[a/b]</button>`;
-      }
-      el.innerHTML = html;
+      el.textContent = `${symbol} ${formattedVal}`;
       el.className = 'expression-row-result';
-
-      const toggleBtn = el.querySelector<HTMLButtonElement>('.fraction-toggle-btn');
-      toggleBtn?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        row.showExactFraction = !row.showExactFraction;
-        updateResultElement(el, row);
-      });
       return;
     }
   }
