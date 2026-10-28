@@ -216,15 +216,71 @@ function createRowElement(row: ExpressionRowData, index: number): HTMLElement {
   mf.smartFence = false;
   mf.setAttribute('aria-label', `Expression ${index + 1}`);
 
+  // Fraction toggle button [a/b] styled to match the other two blue buttons in the toolbar
+  const fracBtn = document.createElement('button');
+  fracBtn.className = 'fraction-toggle-btn';
+  fracBtn.type = 'button';
+  fracBtn.textContent = 'a/b';
+  fracBtn.title = 'Toggle exact fraction / decimal';
+  fracBtn.style.display = 'none';
+
+  function applyFracBtnStyle() {
+    fracBtn.style.boxSizing = 'border-box';
+    fracBtn.style.alignSelf = 'center';
+    fracBtn.style.alignItems = 'center';
+    fracBtn.style.justifyContent = 'center';
+    fracBtn.style.width = '34px';
+    fracBtn.style.height = '34px';
+    fracBtn.style.padding = '0';
+    fracBtn.style.marginRight = '4px';
+    fracBtn.style.cursor = 'pointer';
+    fracBtn.style.borderRadius = '8px';
+    fracBtn.style.border = '1px solid transparent';
+    fracBtn.style.fontFamily = '"Cascadia Mono", Consolas, monospace';
+    fracBtn.style.fontSize = '0.78rem';
+    fracBtn.style.fontWeight = '700';
+    fracBtn.style.lineHeight = '1';
+    fracBtn.style.userSelect = 'none';
+    fracBtn.style.transition = 'background 0.2s cubic-bezier(0.64, 0.09, 0.08, 1), color 0.2s ease';
+    if (row.showExactFraction) {
+      fracBtn.style.background = '#5898ff';
+      fracBtn.style.color = '#0b0d0b';
+    } else {
+      fracBtn.style.background = 'transparent';
+      fracBtn.style.color = '#5898ff';
+    }
+  }
+
+  applyFracBtnStyle();
+
+  fracBtn.onmouseenter = () => {
+    if (!row.showExactFraction) fracBtn.style.background = 'rgba(88, 152, 255, 0.15)';
+  };
+  fracBtn.onmouseleave = () => {
+    if (!row.showExactFraction) fracBtn.style.background = 'transparent';
+  };
+
+  fracBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    row.showExactFraction = !row.showExactFraction;
+    applyFracBtnStyle();
+    updateResultElement(resultDiv, row);
+  });
+
   mf.addEventListener('mount', () => {
     try {
       mf.inlineShortcuts = {
         ...mf.inlineShortcuts,
         root: '\\sqrt[#?]{#?}',
         nthroot: '\\sqrt[#?]{#?}',
-        sum: '\\sum_{#?}^{#?}',
-        prod: '\\prod_{#?}^{#?}',
+        sum: '\\sum_{#?}^{#?} #?',
+        prod: '\\prod_{#?}^{#?} #?',
       };
+
+      const toggles = mf.shadowRoot?.querySelector('.ML__toggles');
+      if (toggles && !toggles.contains(fracBtn)) {
+        toggles.appendChild(fracBtn);
+      }
     } catch {
       // Ignore if already configured
     }
@@ -244,22 +300,8 @@ function createRowElement(row: ExpressionRowData, index: number): HTMLElement {
   });
 
   mainDiv.appendChild(mf);
-
-  // Fraction toggle button [a/b] positioned to the right of math-field (which ends with the 3 blue lines)
-  const fracBtn = document.createElement('button');
-  fracBtn.className = 'fraction-toggle-btn';
-  fracBtn.type = 'button';
-  fracBtn.textContent = 'a/b';
-  fracBtn.title = 'Toggle exact fraction / decimal';
-  fracBtn.style.display = 'none';
-
-  fracBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    row.showExactFraction = !row.showExactFraction;
-    updateResultElement(resultDiv, row);
-  });
+  // Fallback in case shadowRoot toggles aren't available
   mainDiv.appendChild(fracBtn);
-
   mainDiv.appendChild(delBtn);
   article.appendChild(mainDiv);
 
@@ -313,7 +355,9 @@ function createRowElement(row: ExpressionRowData, index: number): HTMLElement {
 
 function updateResultElement(el: HTMLElement, row: ExpressionRowData) {
   const article = el.closest('.expression-row');
-  const fracBtn = article?.querySelector<HTMLButtonElement>('.fraction-toggle-btn');
+  const mf = article?.querySelector<MathfieldElement>('.expression-mathfield');
+  const fracBtn = mf?.shadowRoot?.querySelector<HTMLButtonElement>('.fraction-toggle-btn')
+    ?? article?.querySelector<HTMLButtonElement>('.fraction-toggle-btn');
 
   const hasExactFraction = Boolean(
     row.evaluation &&
@@ -325,6 +369,13 @@ function updateResultElement(el: HTMLElement, row: ExpressionRowData) {
   if (fracBtn) {
     fracBtn.style.display = hasExactFraction ? 'inline-flex' : 'none';
     fracBtn.classList.toggle('active', Boolean(row.showExactFraction));
+    if (row.showExactFraction) {
+      fracBtn.style.background = '#5898ff';
+      fracBtn.style.color = '#0b0d0b';
+    } else {
+      fracBtn.style.background = 'transparent';
+      fracBtn.style.color = '#5898ff';
+    }
   }
 
   if (row.evaluating) {

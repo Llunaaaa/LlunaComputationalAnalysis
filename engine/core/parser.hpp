@@ -126,7 +126,7 @@ private:
         if (match(TokenType::Identifier)) {
             std::string name = previous().text;
 
-            // Check for summation or product: sum(i, a, b, body) or prod(i, a, b, body)
+            // Check for summation or product: sum(i, a, b, body) or sum(i, a, b)(body)
             if (name == "sum" || name == "prod") {
                 consume(TokenType::LParen, name + " requires arguments in parentheses");
                 // 1. Variable name (identifier)
@@ -138,10 +138,17 @@ private:
                 consume(TokenType::Comma, "Expected ',' after lower bound in " + name);
                 // 3. Upper bound
                 auto upper = parse_expression();
-                consume(TokenType::Comma, "Expected ',' after upper bound in " + name);
-                // 4. Target expression / body
-                auto body = parse_expression();
-                consume(TokenType::RParen, "Missing closing parenthesis in " + name);
+
+                std::unique_ptr<AstNode> body;
+                if (match(TokenType::Comma)) {
+                    body = parse_expression();
+                    consume(TokenType::RParen, "Missing closing parenthesis in " + name);
+                } else {
+                    consume(TokenType::RParen, "Missing closing parenthesis in " + name);
+                    consume(TokenType::LParen, name + " requires target expression in parentheses");
+                    body = parse_expression();
+                    consume(TokenType::RParen, "Missing closing parenthesis around target expression in " + name);
+                }
 
                 IterationNode::Kind k = (name == "sum") ? IterationNode::Kind::Sum : IterationNode::Kind::Product;
                 return std::make_unique<IterationNode>(k, var_name, std::move(lower), std::move(upper), std::move(body));

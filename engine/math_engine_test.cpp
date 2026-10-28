@@ -168,12 +168,18 @@ int main() {
     // Capital Sigma (Sum) and Capital Pi (Prod) tests
     assert_value("sum(i, 1, 5, i)", 15.0);
     assert_approximate("sum(i, 1, 5, i)", 0);
+    assert_value("sum(i, 1, 5)(i)", 15.0);
+    assert_approximate("sum(i, 1, 5)(i)", 0);
     assert_value("sum(i, 1, 5, i^2)", 55.0);
     assert_approximate("sum(i, 1, 5, i^2)", 0);
+    assert_value("sum(i, 1, 5)(i^2)", 55.0);
+    assert_approximate("sum(i, 1, 5)(i^2)", 0);
     assert_value("sum(k, 0, 4, 2k+1)", 25.0);
     assert_approximate("sum(k, 0, 4, 2k+1)", 0);
     assert_value("prod(i, 1, 5, i)", 120.0);
     assert_approximate("prod(i, 1, 5, i)", 0);
+    assert_value("prod(i, 1, 5)(i)", 120.0);
+    assert_approximate("prod(i, 1, 5)(i)", 0);
     assert_value("prod(i, 1, 4, i+1)", 120.0);
     assert_approximate("prod(i, 1, 4, i+1)", 0);
     assert_error("sum(i, 5, 2, i)", "Lower bound cannot be greater than upper bound");
