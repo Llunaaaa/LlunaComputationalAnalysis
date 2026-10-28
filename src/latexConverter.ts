@@ -23,6 +23,7 @@ export function latexToEngine(latex: string): string {
   if (!latex || !latex.trim()) return '';
 
   let s = latex.trim();
+  s = s.replace(/\\left\s*([(\[\]])/g, '$1').replace(/\\right\s*([)\]])/g, '$1');
 
   // If there are unpopulated placeholders, prompt clearly
   if (/\\placeholder\{\}/.test(s) || /\\placeholder\b/.test(s)) {
@@ -145,7 +146,7 @@ export function latexToEngine(latex: string): string {
     if (!lowerBound || !upperRaw) throw new Error(`${op === 'sum' ? 'Summation' : 'Product'} requires lower and upper bounds`);
 
     const id = savedSumProd.length;
-    const placeholder = `ZOPZ${id}Z`;
+    const placeholder = `@@SUMPROD${id}@@`;
     savedSumProd.push({
       op,
       varName,
@@ -167,10 +168,14 @@ export function latexToEngine(latex: string): string {
   // Restore saved sum and prod safely without MathLive letter-spacing
   for (let i = 0; i < savedSumProd.length; i++) {
     const item = savedSumProd[i];
-    const phRegex = new RegExp(`Z\\s*O\\s*P\\s*Z\\s*${i}\\s*Z`, 'g');
-    const replacement = `${item.op}(${item.varName}, ${item.lowerBound}, ${item.upperBound}, ${item.body})`;
+    const phRegex = new RegExp(`@+\\s*S\\s*U\\s*M\\s*P\\s*R\\s*O\\s*D\\s*${i}\\s*@+`, 'gi');
+    const replacement = `(${item.op}(${item.varName}, ${item.lowerBound}, ${item.upperBound}, ${item.body}))`;
     expr = expr.replace(phRegex, replacement);
   }
+
+  // MathLive may represent a superscript immediately before a restored operator
+  // as an empty group (`^()`). The restored parenthesized operator is the power.
+  expr = expr.replace(/\^\(\)\s*(?=\()/g, '^');
 
   // Extra safety fallback
   expr = expr.replace(/s\s*u\s*m\s*\(/gi, 'sum(');
