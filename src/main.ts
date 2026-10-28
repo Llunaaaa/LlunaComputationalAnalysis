@@ -214,12 +214,19 @@ function createRowElement(row: ExpressionRowData, index: number): HTMLElement {
   mf.value = row.latex;
   mf.mathVirtualKeyboardPolicy = 'manual';
   mf.smartFence = false;
-  mf.inlineShortcuts = {
-    ...mf.inlineShortcuts,
-    root: '\\sqrt[#?]{#?}',
-    nthroot: '\\sqrt[#?]{#?}',
-  };
   mf.setAttribute('aria-label', `Expression ${index + 1}`);
+
+  mf.addEventListener('mount', () => {
+    try {
+      mf.inlineShortcuts = {
+        ...mf.inlineShortcuts,
+        root: '\\sqrt[#?]{#?}',
+        nthroot: '\\sqrt[#?]{#?}',
+      };
+    } catch {
+      // Ignore if already configured
+    }
+  });
 
   // Delete button
   const delBtn = document.createElement('button');
