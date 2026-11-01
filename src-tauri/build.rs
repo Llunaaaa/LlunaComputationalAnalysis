@@ -1,16 +1,10 @@
 fn main() {
-    println!("cargo:rerun-if-changed=../engine/math_engine.cpp");
-    println!("cargo:rerun-if-changed=../engine/math_engine.h");
-    println!("cargo:rerun-if-changed=../engine/constants/constants.hpp");
-    println!("cargo:rerun-if-changed=../engine/functions/functions.hpp");
-    println!("cargo:rerun-if-changed=../engine/core/token.hpp");
-    println!("cargo:rerun-if-changed=../engine/core/number_value.hpp");
-    println!("cargo:rerun-if-changed=../engine/core/lexer.hpp");
-    println!("cargo:rerun-if-changed=../engine/core/ast.hpp");
-    println!("cargo:rerun-if-changed=../engine/core/parser.hpp");
+    // Directories are tracked recursively, so every engine header is covered.
+    println!("cargo:rerun-if-changed=../engine");
 
     cc::Build::new()
         .cpp(true)
+        .std("c++17")
         .file("../engine/math_engine.cpp")
         .include("../engine")
         .warnings(true)

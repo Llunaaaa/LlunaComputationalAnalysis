@@ -7,11 +7,11 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "test": "node --test src/expression.test.ts src/graph.test.ts"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
-    "@tauri-apps/plugin-opener": "^2",
     "mathlive": "^0.111.1"
   },
   "devDependencies": {

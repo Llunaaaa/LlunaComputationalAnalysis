@@ -10,6 +10,8 @@ export default defineConfig(() => ({
   //
   // 1. prevent Vite from obscuring rust errors
   clearScreen: false,
+  // MathLive is ~800 kB on its own and is loaded lazily, only by sections that need it.
+  build: { chunkSizeWarningLimit: 1000 },
   // 2. tauri expects a fixed port, fail if that port is not available
   server: {
     port: 1420,

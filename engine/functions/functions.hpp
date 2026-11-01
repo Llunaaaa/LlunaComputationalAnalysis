@@ -3,424 +3,432 @@
 #include "../core/number_value.hpp"
 #include "../constants/constants.hpp"
 #include <cmath>
-#include <string>
-#include <stdexcept>
+#include <cstddef>
 #include <limits>
+#include <numeric>
+#include <optional>
+#include <stdexcept>
+#include <string>
 
 namespace lluna::functions {
 
-inline core::NumberValue eval_sqrt(const core::NumberValue& arg) {
-    if (arg.is_negative()) {
-        throw std::runtime_error("Cannot take the square root of a negative value");
-    }
-    if (arg.is_zero()) {
-        return core::NumberValue(0);
-    }
-    if (arg.kind == core::ValueKind::ExactRational) {
-        return core::NumberValue::make_sqrt(arg.rat);
-    }
-    if (arg.kind == core::ValueKind::ExactConstant) {
-        if (arg.pi_exp % 2 == 0 && arg.e_exp % 2 == 0) {
-            core::NumberValue v;
-            v.kind = core::ValueKind::ExactConstant;
-            v.rat = core::NumberValue::make_sqrt(arg.rat).rat;
-            v.pi_exp = arg.pi_exp / 2;
-            v.e_exp = arg.e_exp / 2;
-            return v;
-        }
-    }
+using core::NumberValue;
+using core::Rational;
+using core::ValueKind;
 
-    double d = arg.to_double();
-    if (std::isfinite(d)) {
-        double res = std::sqrt(d);
-        return core::NumberValue::make_approx(res);
-    }
+namespace detail {
 
-    long long exp = arg.exponent();
-    double man = arg.mantissa();
-    if (exp % 2 != 0) {
-        man *= 10.0;
-        exp -= 1;
-    }
-    double res_man = std::sqrt(man);
-    long long res_exp = exp / 2;
-    return core::NumberValue::from_scientific(res_man, res_exp, true);
+inline double log10_abs(const NumberValue& value) {
+    const auto [mantissa, exponent] = value.to_scientific();
+    return std::log10(std::fabs(mantissa)) + static_cast<double>(exponent);
 }
 
-inline core::NumberValue eval_root(const core::NumberValue& idx, const core::NumberValue& arg) {
-    if (!idx.is_integer() || idx.is_negative() || idx.is_zero()) {
+inline NumberValue from_log10(double log10_value, double sign = 1.0) {
+    if (!std::isfinite(log10_value) || std::fabs(log10_value) > 9.0e18) {
+        throw std::runtime_error(core::kUnreasonableComputation);
+    }
+    const double decade = std::floor(log10_value);
+    return NumberValue::from_scientific(sign * std::pow(10.0, log10_value - decade),
+                                        static_cast<long long>(decade));
+}
+
+// log10(x!) = log10(Gamma(x + 1)) by Stirling's series; accurate to ~1e-15
+// relative for the x > 170 range where it is used.
+inline double log10_factorial(double x) {
+    const double log10_e = 1.0 / constants::kLn10;
+    return 0.5 * std::log10(2.0 * constants::kPi * x) + x * (std::log10(x) - log10_e) +
+           (1.0 / (12.0 * x) - 1.0 / (360.0 * x * x * x)) * log10_e;
+}
+
+inline NumberValue negated(NumberValue value) {
+    value.negate();
+    return value;
+}
+
+// k such that the value equals k*pi/12, when it is an exact multiple.
+inline std::optional<long long> twelfths_of_pi(const NumberValue& angle) {
+    if (angle.is_zero()) return 0;
+    if (angle.kind != ValueKind::ExactConstant || angle.pi_exp != 1 || angle.e_exp != 0) return std::nullopt;
+    try {
+        const Rational scaled = angle.rat * Rational(12);
+        if (!scaled.is_integer()) return std::nullopt;
+        long long k = scaled.num % 24;
+        return k < 0 ? k + 24 : k;
+    } catch (const core::RationalOverflow&) {
+        return std::nullopt;
+    }
+}
+
+// sin(k*pi/12) for k in [0, 6] whenever the value has a closed form here.
+inline std::optional<NumberValue> sine_first_quadrant(long long k) {
+    switch (k) {
+        case 0: return NumberValue(0);
+        case 2: return NumberValue(Rational(1, 2));
+        case 3: return NumberValue::make_radical(Rational(1, 2), 2);
+        case 4: return NumberValue::make_radical(Rational(1, 2), 3);
+        case 6: return NumberValue(1);
+        default: return std::nullopt;
+    }
+}
+
+inline std::optional<NumberValue> exact_sine(long long k) {
+    k %= 24;
+    if (k <= 6) return sine_first_quadrant(k);
+    if (k <= 12) return sine_first_quadrant(12 - k);
+    auto value = k <= 18 ? sine_first_quadrant(k - 12) : sine_first_quadrant(24 - k);
+    if (value) value->negate();
+    return value;
+}
+
+inline NumberValue approx_trig_result(double value) {
+    if (!std::isfinite(value)) throw std::runtime_error("The result is not finite");
+    if (std::fabs(value) < 1e-15) return NumberValue(0);
+    return NumberValue::make_approx(value);
+}
+
+inline double finite_angle(const NumberValue& angle) {
+    const double value = angle.to_double();
+    if (!std::isfinite(value) || std::fabs(value) > 1e15) {
+        throw std::runtime_error("Angle is too large to evaluate accurately");
+    }
+    return value;
+}
+
+// Angle (as a multiple of pi) whose sine is the given exact value, if tabulated.
+inline std::optional<Rational> exact_arcsine_ratio(const NumberValue& value) {
+    if (value.is_zero()) return Rational(0);
+    const bool negative = value.is_negative();
+    const Rational magnitude(negative ? -value.rat.num : value.rat.num, value.rat.den);
+    std::optional<Rational> ratio;
+    if (value.kind == ValueKind::ExactRational) {
+        if (magnitude.is_one()) ratio = Rational(1, 2);
+        else if (magnitude.num == 1 && magnitude.den == 2) ratio = Rational(1, 6);
+    } else if (value.kind == ValueKind::ExactRadical && magnitude.num == 1 && magnitude.den == 2) {
+        if (value.radical == 2) ratio = Rational(1, 4);
+        else if (value.radical == 3) ratio = Rational(1, 3);
+    }
+    if (ratio && negative) ratio->num = -ratio->num;
+    return ratio;
+}
+
+inline std::optional<Rational> exact_arctangent_ratio(const NumberValue& value) {
+    if (value.is_zero()) return Rational(0);
+    const bool negative = value.is_negative();
+    const Rational magnitude(negative ? -value.rat.num : value.rat.num, value.rat.den);
+    std::optional<Rational> ratio;
+    if (value.kind == ValueKind::ExactRational && magnitude.is_one()) ratio = Rational(1, 4);
+    else if (value.kind == ValueKind::ExactRadical && value.radical == 3) {
+        if (magnitude.is_one()) ratio = Rational(1, 3);
+        else if (magnitude.num == 1 && magnitude.den == 3) ratio = Rational(1, 6);
+    }
+    if (ratio && negative) ratio->num = -ratio->num;
+    return ratio;
+}
+
+inline NumberValue pi_multiple(Rational ratio) {
+    return NumberValue::make_constant(ratio, 1, 0);
+}
+
+} // namespace detail
+
+inline NumberValue eval_power(const NumberValue& base, const NumberValue& exponent) {
+    return core::power(base, exponent);
+}
+
+inline NumberValue eval_sqrt(const NumberValue& arg) {
+    if (arg.is_negative()) throw std::runtime_error("Cannot take the square root of a negative value");
+    if (arg.kind == ValueKind::ExactConstant && arg.pi_exp % 2 == 0 && arg.e_exp % 2 == 0) {
+        const NumberValue coefficient = NumberValue::make_sqrt(arg.rat);
+        if (coefficient.kind == ValueKind::ExactRational) {
+            return NumberValue::make_constant(coefficient.rat, arg.pi_exp / 2, arg.e_exp / 2);
+        }
+    }
+    return core::power(arg, NumberValue(Rational(1, 2)));
+}
+
+inline NumberValue eval_root(const NumberValue& index, const NumberValue& arg) {
+    if (!index.is_integer() || index.is_negative() || index.is_zero()) {
         throw std::runtime_error("Root index must be a positive integer");
     }
-    long long n = idx.to_integer();
-    if (arg.is_negative() && n % 2 == 0) {
-        throw std::runtime_error("Even roots cannot contain a negative value");
-    }
-    double sign = arg.is_negative() ? -1.0 : 1.0;
-
+    const long long n = index.to_integer();
+    if (arg.is_negative() && n % 2 == 0) throw std::runtime_error("Even roots cannot contain a negative value");
+    if (n == 2) return eval_sqrt(arg);
     if (n == 1) return arg;
-    if (n == 2) {
-        if (sign < 0) throw std::runtime_error("Cannot take the square root of a negative value");
-        return eval_sqrt(arg);
-    }
-
-    if (arg.kind == core::ValueKind::ExactRational && arg.rat.is_integer()) {
-        long long abs_val = std::abs(arg.rat.num);
-        if (abs_val == 0) return core::NumberValue(0);
-        if (abs_val == 1) return core::NumberValue(static_cast<long long>(sign * 1));
-        if (n <= 62) {
-            long long root_cand = static_cast<long long>(std::round(std::pow(static_cast<double>(abs_val), 1.0 / static_cast<double>(n))));
-            if (root_cand > 0) {
-                long long p = 1;
-                bool overflow = false;
-                for (long long i = 0; i < n; ++i) {
-                    if (p > std::numeric_limits<long long>::max() / root_cand) {
-                        overflow = true;
-                        break;
-                    }
-                    p *= root_cand;
-                }
-                if (!overflow && p == abs_val) {
-                    return core::NumberValue(static_cast<long long>(sign * root_cand));
-                }
-            }
-        }
-    }
-
-    double d = std::fabs(arg.to_double());
-    if (std::isfinite(d)) {
-        double res = std::pow(d, 1.0 / static_cast<double>(n));
-        return core::NumberValue::make_approx(sign * res);
-    }
-
-    double log10_val = std::log10(std::fabs(arg.mantissa())) + static_cast<double>(arg.exponent());
-    double res_log = log10_val / static_cast<double>(n);
-    long long res_exp = static_cast<long long>(std::floor(res_log));
-    double rem = res_log - static_cast<double>(res_exp);
-    double res_man = sign * std::pow(10.0, rem);
-    return core::NumberValue::from_scientific(res_man, res_exp, true);
+    return core::power(arg, NumberValue(Rational(1, n)));
 }
 
-inline core::NumberValue eval_log(const core::NumberValue& base, const core::NumberValue& arg) {
+inline NumberValue eval_log(const NumberValue& base, const NumberValue& arg) {
     if (base.is_negative() || base.is_zero()) {
         throw std::runtime_error("Logarithm base must be positive and not equal to 1");
     }
-    if (arg.is_negative() || arg.is_zero()) {
-        throw std::runtime_error("Logarithm argument must be positive");
-    }
-
-    // Symbolic cancellation: log_b(b) = 1
-    if (base.kind == arg.kind) {
-        if (base.kind == core::ValueKind::ExactRational && base.rat.num == arg.rat.num && base.rat.den == arg.rat.den) {
-            if (base.rat.is_one()) throw std::runtime_error("Logarithm base cannot be 1");
-            return core::NumberValue(1);
-        }
-        if (base.kind == core::ValueKind::ExactConstant && base.pi_exp == arg.pi_exp && base.e_exp == arg.e_exp && base.rat.num == arg.rat.num && base.rat.den == arg.rat.den) {
-            return core::NumberValue(1);
-        }
-    }
-
-    if (base.kind == core::ValueKind::ExactRational && base.rat.is_one()) {
+    if (arg.is_negative() || arg.is_zero()) throw std::runtime_error("Logarithm argument must be positive");
+    if (base.kind == ValueKind::ExactRational && base.rat.is_one()) {
         throw std::runtime_error("Logarithm base cannot be 1");
     }
-    if (arg.kind == core::ValueKind::ExactRational && arg.rat.is_one()) {
-        return core::NumberValue(0);
+    if (arg.kind == ValueKind::ExactRational && arg.rat.is_one()) return NumberValue(0);
+
+    const bool same_exact_value = base.kind == arg.kind && base.kind != ValueKind::RealApprox &&
+        base.rat.num == arg.rat.num && base.rat.den == arg.rat.den && base.radical == arg.radical &&
+        base.pi_exp == arg.pi_exp && base.e_exp == arg.e_exp;
+    if (same_exact_value) return NumberValue(1);
+
+    // log_b(a) = ±k when a or 1/a is an integer power of b or 1/b.
+    if (base.kind == ValueKind::ExactRational && arg.kind == ValueKind::ExactRational) {
+        const Rational& b = base.rat;
+        const Rational& a = arg.rat;
+        const auto match = [](long long base_part, long long arg_part, long long sign) -> std::optional<NumberValue> {
+            const auto [is_power, k] = core::check_integer_log(base_part, arg_part);
+            if (is_power) return NumberValue(sign * k);
+            return std::nullopt;
+        };
+        std::optional<NumberValue> exact;
+        if (b.den == 1 && a.den == 1) exact = match(b.num, a.num, 1);
+        else if (b.den == 1 && a.num == 1) exact = match(b.num, a.den, -1);
+        else if (b.num == 1 && a.den == 1) exact = match(b.den, a.num, -1);
+        else if (b.num == 1 && a.num == 1) exact = match(b.den, a.den, 1);
+        if (exact) return *exact;
     }
 
-    // Check if integer log or reciprocal log: e.g. log_2(8) = 3, log_2(1/8) = -3, log_{1/2}(8) = -3, log_{10}(100) = 2
-    if (base.kind == core::ValueKind::ExactRational && arg.kind == core::ValueKind::ExactRational) {
-        long long b_num = base.rat.num, b_den = base.rat.den;
-        long long a_num = arg.rat.num, a_den = arg.rat.den;
-        if (b_den == 1 && a_den == 1) {
-            auto [is_pow, p] = core::check_integer_log(b_num, a_num);
-            if (is_pow) return core::NumberValue(p);
-        } else if (b_den == 1 && a_num == 1) {
-            auto [is_pow, p] = core::check_integer_log(b_num, a_den);
-            if (is_pow) return core::NumberValue(-p);
-        } else if (b_num == 1 && a_den == 1) {
-            auto [is_pow, p] = core::check_integer_log(b_den, a_num);
-            if (is_pow) return core::NumberValue(-p);
-        } else if (b_num == 1 && a_num == 1) {
-            auto [is_pow, p] = core::check_integer_log(b_den, a_den);
-            if (is_pow) return core::NumberValue(p);
-        }
-    }
-
-    double log10_arg = std::log10(std::fabs(arg.mantissa())) + static_cast<double>(arg.exponent());
-    double log10_base = std::log10(std::fabs(base.mantissa())) + static_cast<double>(base.exponent());
-    double res = log10_arg / log10_base;
-    if (!std::isfinite(res)) {
-        throw std::runtime_error("The result is not finite");
-    }
-    return core::NumberValue::make_approx(res);
+    const double denominator = detail::log10_abs(base);
+    if (denominator == 0.0) throw std::runtime_error("Logarithm base cannot be 1");
+    return NumberValue::make_approx(detail::log10_abs(arg) / denominator);
 }
 
-inline core::NumberValue eval_ln(const core::NumberValue& arg) {
-    if (arg.is_negative() || arg.is_zero()) {
-        throw std::runtime_error("Logarithm argument must be positive");
-    }
-
-    // Symbolic cancellation: ln(e) = 1, ln(e^m) = m
-    if (arg.kind == core::ValueKind::ExactConstant && arg.pi_exp == 0 && arg.rat.is_one()) {
-        return core::NumberValue(arg.e_exp);
-    }
-    if (arg.kind == core::ValueKind::ExactRational && arg.rat.is_one()) {
-        return core::NumberValue(0);
-    }
-
-    double log10_arg = std::log10(std::fabs(arg.mantissa())) + static_cast<double>(arg.exponent());
-    double res = log10_arg / std::log10(constants::compute_euler());
-    if (!std::isfinite(res)) {
-        throw std::runtime_error("The result is not finite");
-    }
-    return core::NumberValue::make_approx(res);
+inline NumberValue eval_ln(const NumberValue& arg) {
+    if (arg.is_negative() || arg.is_zero()) throw std::runtime_error("Logarithm argument must be positive");
+    if (arg.kind == ValueKind::ExactRational && arg.rat.is_one()) return NumberValue(0);
+    if (arg.kind == ValueKind::ExactConstant && arg.pi_exp == 0 && arg.rat.is_one()) return NumberValue(arg.e_exp);
+    return NumberValue::make_approx(detail::log10_abs(arg) * constants::kLn10);
 }
 
-inline core::NumberValue eval_factorial(const core::NumberValue& arg) {
-    // 1. Negative integers are undefined in mathematics (poles of the Gamma function)
-    if (arg.is_negative() && arg.is_integer()) {
-        throw std::runtime_error("Factorial is undefined for negative integers");
+inline NumberValue eval_exp(const NumberValue& arg) {
+    return core::power(NumberValue::make_e(), arg);
+}
+
+inline NumberValue eval_factorial(const NumberValue& arg) {
+    if (arg.is_negative() && arg.is_integer()) throw std::runtime_error("Factorial is undefined for negative integers");
+    if (arg.exponent() >= 18 && std::fabs(arg.to_double()) > 1e18) {
+        throw std::runtime_error(core::kUnreasonableComputation);
     }
 
-    // 2. Computational Guardrail: upper bound of 1e18 (1 quintillion) to prevent
-    // system freeze and exponent tracking overflow
-    if (arg.exponent() > 18 || (arg.exponent() == 18 && std::fabs(arg.mantissa()) > 1.0) || std::fabs(arg.to_double()) > 1e18) {
-        throw std::runtime_error("Operation requires an unreasonable amount of computational power");
-    }
-
-    // 3. Non-negative integers
-    if (arg.is_integer() && !arg.is_negative()) {
-        double d = arg.to_double();
-        long long n = static_cast<long long>(std::round(d));
-        if (n <= 1) {
-            return core::NumberValue(1.0, false);
-        }
-        // Exact integers in IEEE-754 double (up to 18! = 6.4e15 < 2^53)
-        if (n <= 18) {
-            double fact = 1.0;
-            for (long long i = 2; i <= n; ++i) {
-                fact *= static_cast<double>(i);
-            }
-            return core::NumberValue(fact, false);
+    if (arg.is_integer()) {
+        const long long n = arg.to_integer();
+        if (n <= 20) {
+            long long product = 1;
+            for (long long i = 2; i <= n; ++i) product *= i;
+            return NumberValue(product);
         }
         if (n <= 170) {
-            double fact = 1.0;
-            for (long long i = 2; i <= n; ++i) {
-                fact *= static_cast<double>(i);
-            }
-            // For n > 18, double precision rounds lower bits, so it's an approximation
-            return core::NumberValue(fact, true);
+            double product = 1.0;
+            for (long long i = 2; i <= n; ++i) product *= static_cast<double>(i);
+            return NumberValue::make_approx(product);
         }
-
-        // Loop-based logic up to 100,000 for maximum accuracy
         if (n <= 100000) {
             double mantissa = 1.0;
             long long exponent = 0;
             for (long long i = 2; i <= n; ++i) {
                 mantissa *= static_cast<double>(i);
-                while (mantissa >= 1e12) {
+                if (mantissa >= 1e12) {
                     mantissa /= 1e12;
                     exponent += 12;
                 }
             }
-            while (mantissa >= 10.0) {
-                mantissa /= 10.0;
-                exponent += 1;
-            }
-            while (mantissa < 1.0 && mantissa > 0.0) {
-                mantissa *= 10.0;
-                exponent -= 1;
-            }
-            return core::NumberValue::from_scientific(mantissa, exponent, true);
+            return NumberValue::from_scientific(mantissa, exponent);
         }
-
-        // For n > 100,000: Stirling's approximation with Ramanujan 1/(12n) correction
-        double pi_val = constants::compute_pi();
-        double log10_2pi = std::log10(2.0 * pi_val);
-        double log10_e = std::log10(constants::compute_euler());
-        double log10_n = std::log10(static_cast<double>(n));
-        double log10_fact = 0.5 * (log10_2pi + log10_n) + static_cast<double>(n) * (log10_n - log10_e)
-                           + (1.0 / (12.0 * static_cast<double>(n))) * log10_e;
-
-        if (!std::isfinite(log10_fact) ||
-            log10_fact >= static_cast<double>(std::numeric_limits<long long>::max()) - 1000.0) {
-            throw std::runtime_error("Operation requires an unreasonable amount of computational power");
-        }
-
-        long long exponent = static_cast<long long>(std::floor(log10_fact));
-        double rem = log10_fact - static_cast<double>(exponent);
-        double mantissa = std::pow(10.0, rem);
-
-        while (mantissa >= 10.0) {
-            mantissa /= 10.0;
-            exponent += 1;
-        }
-        while (mantissa < 1.0 && mantissa > 0.0) {
-            mantissa *= 10.0;
-            exponent -= 1;
-        }
-
-        return core::NumberValue::from_scientific(mantissa, exponent, true);
+        return detail::from_log10(detail::log10_factorial(static_cast<double>(n)));
     }
 
-    // 4. Non-integers (both positive and negative):
-    // Standard mathematical extension via Euler's Gamma function: x! = Gamma(x + 1)
-    double x = arg.to_double();
+    // Non-integers use Gamma: x! = Gamma(x + 1).
+    const double x = arg.to_double();
     if (std::fabs(x) <= 170.0) {
-        double val = std::tgamma(x + 1.0);
-        if (!std::isfinite(val)) {
-            throw std::runtime_error("The result is not finite");
-        }
-        return core::NumberValue(val, true);
+        const double value = std::tgamma(x + 1.0);
+        if (!std::isfinite(value)) throw std::runtime_error("The result is not finite");
+        return NumberValue::make_approx(value);
     }
+    if (x > 0.0) return detail::from_log10(detail::log10_factorial(x));
 
-    // For large non-integers |x| > 170:
-    if (x > 170.0) {
-        double pi_val = constants::compute_pi();
-        double log10_2pi = std::log10(2.0 * pi_val);
-        double log10_e = std::log10(constants::compute_euler());
-        double log10_x = std::log10(x);
-        double log10_fact = 0.5 * (log10_2pi + log10_x) + x * (log10_x - log10_e)
-                           + (1.0 / (12.0 * x)) * log10_e;
-
-        if (!std::isfinite(log10_fact) ||
-            log10_fact >= static_cast<double>(std::numeric_limits<long long>::max()) - 1000.0) {
-            throw std::runtime_error("Operation requires an unreasonable amount of computational power");
-        }
-
-        long long exponent = static_cast<long long>(std::floor(log10_fact));
-        double rem = log10_fact - static_cast<double>(exponent);
-        double mantissa = std::pow(10.0, rem);
-
-        while (mantissa >= 10.0) {
-            mantissa /= 10.0;
-            exponent += 1;
-        }
-        while (mantissa < 1.0 && mantissa > 0.0) {
-            mantissa *= 10.0;
-            exponent -= 1;
-        }
-
-        return core::NumberValue::from_scientific(mantissa, exponent, true);
-    }
-
-    // For negative non-integers x < -170:
-    // Euler's reflection formula: Gamma(x + 1) = pi / (sin(pi * (x + 1)) * Gamma(-x))
-    double pi_val = constants::compute_pi();
-    double pos_arg = -x;
-    double log10_2pi = std::log10(2.0 * pi_val);
-    double log10_e = std::log10(constants::compute_euler());
-    double log10_pos = std::log10(pos_arg);
-    double log10_gamma_pos = 0.5 * (log10_2pi + log10_pos) + pos_arg * (log10_pos - log10_e)
-                           + (1.0 / (12.0 * pos_arg)) * log10_e;
-
-    double sin_val = std::sin(pi_val * (x + 1.0));
-    if (sin_val == 0.0) {
-        throw std::runtime_error("Factorial is undefined for negative integers");
-    }
-    double sign = sin_val < 0.0 ? -1.0 : 1.0;
-    double log10_fact = std::log10(pi_val) - std::log10(std::fabs(sin_val)) - log10_gamma_pos;
-
-    long long exponent = static_cast<long long>(std::floor(log10_fact));
-    double rem = log10_fact - static_cast<double>(exponent);
-    double mantissa = sign * std::pow(10.0, rem);
-
-    while (std::fabs(mantissa) >= 10.0) {
-        mantissa /= 10.0;
-        exponent += 1;
-    }
-    while (std::fabs(mantissa) < 1.0 && mantissa != 0.0) {
-        mantissa *= 10.0;
-        exponent -= 1;
-    }
-
-    return core::NumberValue::from_scientific(mantissa, exponent, true);
+    // Reflection: Gamma(x + 1) = pi / (sin(pi (x + 1)) * Gamma(-x)), with Gamma(-x) = (-x - 1)!.
+    const double sine = std::sin(constants::kPi * (x + 1.0));
+    if (sine == 0.0) throw std::runtime_error("Factorial is undefined for negative integers");
+    const double log10_value = std::log10(constants::kPi) - std::log10(std::fabs(sine)) -
+                               detail::log10_factorial(-x - 1.0);
+    return detail::from_log10(log10_value, sine < 0.0 ? -1.0 : 1.0);
 }
 
-inline core::NumberValue eval_abs(const core::NumberValue& arg) {
-    if (!arg.is_negative()) return arg;
-    core::NumberValue res = arg;
-    res.negate();
-    return res;
+inline NumberValue eval_abs(const NumberValue& arg) {
+    return arg.is_negative() ? detail::negated(arg) : arg;
 }
 
-inline core::NumberValue eval_gcd(const core::NumberValue& a, const core::NumberValue& b) {
-    if (!a.is_integer() || !b.is_integer()) {
-        throw std::runtime_error("gcd requires integer arguments");
+inline NumberValue eval_sin(const NumberValue& arg) {
+    if (const auto k = detail::twelfths_of_pi(arg)) {
+        if (auto exact = detail::exact_sine(*k)) return *exact;
     }
-    long long n1 = std::abs(a.to_integer());
-    long long n2 = std::abs(b.to_integer());
-    return core::NumberValue(static_cast<long long>(std::gcd(n1, n2)));
+    return detail::approx_trig_result(std::sin(detail::finite_angle(arg)));
 }
 
-inline core::NumberValue eval_lcm(const core::NumberValue& a, const core::NumberValue& b) {
-    if (!a.is_integer() || !b.is_integer()) {
-        throw std::runtime_error("lcm requires integer arguments");
+inline NumberValue eval_cos(const NumberValue& arg) {
+    if (const auto k = detail::twelfths_of_pi(arg)) {
+        if (auto exact = detail::exact_sine(*k + 6)) return *exact;
     }
-    long long n1 = std::abs(a.to_integer());
-    long long n2 = std::abs(b.to_integer());
-    if (n1 == 0 || n2 == 0) return core::NumberValue(0);
-    return core::NumberValue(static_cast<long long>(std::lcm(n1, n2)));
+    return detail::approx_trig_result(std::cos(detail::finite_angle(arg)));
 }
 
-inline core::NumberValue eval_mod(const core::NumberValue& a, const core::NumberValue& b) {
-    if (b.is_zero()) {
-        throw std::runtime_error("Cannot divide by zero");
+inline NumberValue eval_tan(const NumberValue& arg) {
+    if (const auto k = detail::twelfths_of_pi(arg)) {
+        if (*k % 12 == 6) throw std::runtime_error("Tangent is undefined at odd multiples of pi/2");
+        const auto sine = detail::exact_sine(*k);
+        const auto cosine = detail::exact_sine(*k + 6);
+        if (sine && cosine) return core::divide(*sine, *cosine);
     }
-    if (a.is_integer() && b.is_integer()) {
-        long long n1 = a.to_integer();
-        long long n2 = b.to_integer();
-        long long rem = n1 % n2;
-        if (rem < 0 && n2 > 0) rem += n2;
-        return core::NumberValue(rem);
-    }
-    double d1 = a.to_double();
-    double d2 = b.to_double();
-    double rem = std::fmod(d1, d2);
-    if (rem < 0.0 && d2 > 0.0) rem += d2;
-    return core::NumberValue::make_approx(rem);
+    const double angle = detail::finite_angle(arg);
+    const double cosine = std::cos(angle);
+    if (std::fabs(cosine) < 1e-14) throw std::runtime_error("Tangent is undefined at this angle");
+    return detail::approx_trig_result(std::sin(angle) / cosine);
 }
 
-inline core::NumberValue eval_nCr(const core::NumberValue& a, const core::NumberValue& b) {
-    if (!a.is_integer() || !b.is_integer()) {
-        throw std::runtime_error("Combinations (nCr) require integer arguments");
+inline NumberValue eval_asin(const NumberValue& arg) {
+    const double value = arg.to_double();
+    if (!(std::fabs(value) <= 1.0)) throw std::runtime_error("Inverse sine is only defined on [-1, 1]");
+    if (const auto ratio = detail::exact_arcsine_ratio(arg)) return detail::pi_multiple(*ratio);
+    return NumberValue::make_approx(std::asin(value));
+}
+
+inline NumberValue eval_acos(const NumberValue& arg) {
+    const double value = arg.to_double();
+    if (!(std::fabs(value) <= 1.0)) throw std::runtime_error("Inverse cosine is only defined on [-1, 1]");
+    if (const auto ratio = detail::exact_arcsine_ratio(arg)) {
+        return detail::pi_multiple(Rational(1, 2) - *ratio);
     }
-    long long n = a.to_integer();
+    return NumberValue::make_approx(std::acos(value));
+}
+
+inline NumberValue eval_atan(const NumberValue& arg) {
+    if (const auto ratio = detail::exact_arctangent_ratio(arg)) return detail::pi_multiple(*ratio);
+    return NumberValue::make_approx(std::atan(arg.to_double()));
+}
+
+inline NumberValue eval_gcd(const NumberValue& a, const NumberValue& b) {
+    if (!a.is_integer() || !b.is_integer()) throw std::runtime_error("gcd requires integer arguments");
+    return NumberValue(std::gcd(std::llabs(a.to_integer()), std::llabs(b.to_integer())));
+}
+
+inline NumberValue eval_lcm(const NumberValue& a, const NumberValue& b) {
+    if (!a.is_integer() || !b.is_integer()) throw std::runtime_error("lcm requires integer arguments");
+    const long long left = std::llabs(a.to_integer());
+    const long long right = std::llabs(b.to_integer());
+    if (left == 0 || right == 0) return NumberValue(0);
+    const long long reduced = left / std::gcd(left, right);
+    try {
+        return NumberValue(core::checked_multiply(reduced, right));
+    } catch (const core::RationalOverflow&) {
+        return NumberValue::make_approx(static_cast<double>(reduced) * static_cast<double>(right));
+    }
+}
+
+inline NumberValue eval_mod(const NumberValue& a, const NumberValue& b) {
+    if (b.is_zero()) throw std::runtime_error("Cannot divide by zero");
+    if (a.kind == ValueKind::ExactRational && b.kind == ValueKind::ExactRational) {
+        // a - b*floor(a/b), exact for rationals.
+        const Rational quotient = a.rat / b.rat;
+        long long floor_value = quotient.num / quotient.den;
+        if (quotient.num % quotient.den != 0 && quotient.num < 0) --floor_value;
+        const Rational remainder = a.rat - b.rat * Rational(floor_value);
+        return NumberValue(remainder);
+    }
+    const double divisor = b.to_double();
+    double remainder = std::fmod(a.to_double(), divisor);
+    if (remainder != 0.0 && (remainder < 0.0) != (divisor < 0.0)) remainder += divisor;
+    return NumberValue::make_approx(remainder);
+}
+
+inline NumberValue eval_nCr(const NumberValue& a, const NumberValue& b) {
+    if (!a.is_integer() || !b.is_integer()) throw std::runtime_error("Combinations (nCr) require integer arguments");
+    const long long n = a.to_integer();
     long long r = b.to_integer();
-    if (r < 0 || r > n) return core::NumberValue(0);
-    if (r == 0 || r == n) return core::NumberValue(1);
+    if (r < 0 || r > n) return NumberValue(0);
     if (r > n - r) r = n - r;
-    if (n <= 62) {
-        long long res = 1;
+    try {
+        // Each partial product is C(n - r + i, i), so the division is exact;
+        // dividing by gcd first keeps intermediates as small as possible.
+        long long result = 1;
         for (long long i = 1; i <= r; ++i) {
-            res = (res * (n - i + 1)) / i;
+            const long long g = std::gcd(result, i);
+            result = core::checked_multiply(result / g, (n - r + i) / (i / g));
         }
-        return core::NumberValue(res);
+        return NumberValue(result);
+    } catch (const core::RationalOverflow&) {
+        return core::divide(eval_factorial(a),
+                            core::multiply(eval_factorial(NumberValue(r)), eval_factorial(NumberValue(n - r))));
     }
-    return core::divide(eval_factorial(a), core::multiply(eval_factorial(b), eval_factorial(core::NumberValue(n - r))));
 }
 
-inline core::NumberValue eval_nPr(const core::NumberValue& a, const core::NumberValue& b) {
-    if (!a.is_integer() || !b.is_integer()) {
-        throw std::runtime_error("Permutations (nPr) require integer arguments");
+inline NumberValue eval_nPr(const NumberValue& a, const NumberValue& b) {
+    if (!a.is_integer() || !b.is_integer()) throw std::runtime_error("Permutations (nPr) require integer arguments");
+    const long long n = a.to_integer();
+    const long long r = b.to_integer();
+    if (r < 0 || r > n) return NumberValue(0);
+    try {
+        long long result = 1;
+        for (long long i = 0; i < r; ++i) result = core::checked_multiply(result, n - i);
+        return NumberValue(result);
+    } catch (const core::RationalOverflow&) {
+        return core::divide(eval_factorial(a), eval_factorial(NumberValue(n - r)));
     }
-    long long n = a.to_integer();
-    long long r = b.to_integer();
-    if (r < 0 || r > n) return core::NumberValue(0);
-    if (r == 0) return core::NumberValue(1);
-    if (n <= 20) {
-        long long res = 1;
-        for (long long i = 0; i < r; ++i) {
-            res *= (n - i);
-        }
-        return core::NumberValue(res);
+}
+
+struct FunctionSpec {
+    const char* name;
+    unsigned min_args;
+    unsigned max_args;
+    NumberValue (*unary)(const NumberValue&);
+    NumberValue (*binary)(const NumberValue&, const NumberValue&);
+};
+
+inline NumberValue log10_of(const NumberValue& arg) { return eval_log(NumberValue(10), arg); }
+
+// Single source of truth for callable functions: the parser uses it to
+// recognise names and the evaluator to dispatch and check arity.
+inline constexpr FunctionSpec kFunctions[] = {
+    {"sqrt", 1, 1, eval_sqrt, nullptr},
+    {"root", 2, 2, nullptr, eval_root},
+    {"log", 1, 2, log10_of, eval_log},
+    {"ln", 1, 1, eval_ln, nullptr},
+    {"exp", 1, 1, eval_exp, nullptr},
+    {"abs", 1, 1, eval_abs, nullptr},
+    {"sin", 1, 1, eval_sin, nullptr},
+    {"cos", 1, 1, eval_cos, nullptr},
+    {"tan", 1, 1, eval_tan, nullptr},
+    {"asin", 1, 1, eval_asin, nullptr},
+    {"acos", 1, 1, eval_acos, nullptr},
+    {"atan", 1, 1, eval_atan, nullptr},
+    {"gcd", 2, 2, nullptr, eval_gcd},
+    {"lcm", 2, 2, nullptr, eval_lcm},
+    {"mod", 2, 2, nullptr, eval_mod},
+    {"nCr", 2, 2, nullptr, eval_nCr},
+    {"comb", 2, 2, nullptr, eval_nCr},
+    {"nPr", 2, 2, nullptr, eval_nPr},
+    {"perm", 2, 2, nullptr, eval_nPr},
+};
+
+inline const FunctionSpec* find_function(const std::string& name) {
+    for (const auto& spec : kFunctions) {
+        if (name == spec.name) return &spec;
     }
-    return core::divide(eval_factorial(a), eval_factorial(core::NumberValue(n - r)));
+    return nullptr;
 }
 
 inline bool is_function_name(const std::string& name) {
-    return name == "sqrt" || name == "root" || name == "log" || name == "ln" ||
-           name == "abs" || name == "gcd" || name == "lcm" || name == "mod" ||
-           name == "nCr" || name == "comb" || name == "nPr" || name == "perm";
+    return find_function(name) != nullptr;
+}
+
+inline std::string arity_message(const FunctionSpec& spec) {
+    std::string message = std::string(spec.name) + " requires ";
+    if (spec.min_args == spec.max_args) {
+        message += "exactly " + std::to_string(spec.min_args) + (spec.min_args == 1 ? " argument" : " arguments");
+    } else {
+        message += std::to_string(spec.min_args) + " or " + std::to_string(spec.max_args) + " arguments";
+    }
+    return message;
 }
 
 } // namespace lluna::functions

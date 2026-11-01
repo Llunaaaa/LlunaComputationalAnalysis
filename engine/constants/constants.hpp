@@ -1,56 +1,35 @@
 #pragma once
 
-#include <cmath>
+#include <cstring>
 #include <string>
-#include <vector>
-#include <functional>
 
 namespace lluna::constants {
 
+inline constexpr double kPi = 3.14159265358979323846;
+inline constexpr double kE = 2.71828182845904523536;
+inline constexpr double kPhi = 1.61803398874989484820;
+inline constexpr double kLn10 = 2.30258509299404568402;
+
+enum class ConstantId { Pi, E, Phi };
+
 struct ConstantDefinition {
-    std::string name;
-    std::string symbol;
-    std::function<double()> compute;
-    bool is_irrational;
+    const char* name;
+    const char* symbol;
+    ConstantId id;
 };
 
-inline double compute_pi() {
-    return 4.0 * std::atan(1.0);
-}
-
-inline double compute_euler() {
-    // e = sum_{k=0}^{25} 1 / k!
-    // 25 iterations guarantees convergence to machine precision in double (53-bit mantissa)
-    double sum = 0.0;
-    double term = 1.0;
-    for (int k = 1; k <= 25; ++k) {
-        sum += term;
-        term /= static_cast<double>(k);
-    }
-    return sum;
-}
-
-inline double compute_phi() {
-    return (1.0 + std::sqrt(5.0)) / 2.0;
-}
-
-inline const std::vector<ConstantDefinition>& get_all_constants() {
-    static const std::vector<ConstantDefinition> registry = {
-        {"pi", "π", compute_pi, true},
-        {"π", "π", compute_pi, true},
-        {"e", "e", compute_euler, true},
-        {"phi", "ϕ", compute_phi, true},
-        {"ϕ", "ϕ", compute_phi, true},
-        {"φ", "φ", compute_phi, true}
-    };
-    return registry;
-}
+inline constexpr ConstantDefinition kConstants[] = {
+    {"pi", "π", ConstantId::Pi},
+    {"π", "π", ConstantId::Pi},
+    {"e", "e", ConstantId::E},
+    {"phi", "ϕ", ConstantId::Phi},
+    {"ϕ", "ϕ", ConstantId::Phi},
+    {"φ", "ϕ", ConstantId::Phi},
+};
 
 inline const ConstantDefinition* find_constant(const std::string& name) {
-    for (const auto& c : get_all_constants()) {
-        if (c.name == name) {
-            return &c;
-        }
+    for (const auto& constant : kConstants) {
+        if (name == constant.name) return &constant;
     }
     return nullptr;
 }

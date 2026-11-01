@@ -1,49 +1,44 @@
 #include "math_engine.h"
-#include "constants/constants.hpp"
-#include "functions/functions.hpp"
-#include "core/token.hpp"
 #include "core/lexer.hpp"
-#include "core/ast.hpp"
 #include "core/parser.hpp"
 
+#include <algorithm>
 #include <cstring>
-#include <string>
 #include <exception>
+#include <string>
+
+namespace {
+
+template <std::size_t N>
+void copy_text(char (&target)[N], const std::string& text) {
+    const std::size_t length = std::min(text.size(), N - 1);
+    std::memcpy(target, text.data(), length);
+    target[length] = '\0';
+}
+
+MathResult error_result(const char* message) {
+    MathResult result{};
+    result.error_code = 1;
+    copy_text(result.error_message, message);
+    return result;
+}
+
+} // namespace
 
 extern "C" MathResult evaluate_expression(const char* expression) {
-    if (expression == nullptr || expression[0] == '\0') {
-        MathResult result{};
-        result.error_code = 1;
-        result.is_approximate = 0;
-        result.value = 0.0;
-        std::strncpy(result.error_message, "Enter an expression", sizeof(result.error_message) - 1);
-        return result;
-    }
+    if (expression == nullptr || expression[0] == '\0') return error_result("Enter an expression");
 
     try {
-        std::string expr_str(expression);
-        lluna::core::Lexer lexer(expr_str);
-        auto tokens = lexer.tokenize();
-
-        lluna::core::Parser parser(std::move(tokens));
-        auto ast = parser.parse();
-
-        auto eval_res = ast->evaluate();
+        lluna::core::Parser parser(lluna::core::Lexer(expression).tokenize());
+        const lluna::core::NumberValue value = parser.parse()->evaluate();
 
         MathResult result{};
-        result.error_code = 0;
-        result.is_approximate = eval_res.is_approximate() ? 1 : 0;
-        result.value = eval_res.to_double();
-        std::strncpy(result.exact_value, eval_res.exact_repr.c_str(), sizeof(result.exact_value) - 1);
-        std::string disp = eval_res.format();
-        std::strncpy(result.display_value, disp.c_str(), sizeof(result.display_value) - 1);
+        result.is_approximate = value.is_approximate() ? 1 : 0;
+        result.value = value.to_double();
+        copy_text(result.exact_value, value.exact_string());
+        copy_text(result.display_value, value.format());
         return result;
     } catch (const std::exception& error) {
-        MathResult result{};
-        result.error_code = 1;
-        result.is_approximate = 0;
-        result.value = 0.0;
-        std::strncpy(result.error_message, error.what(), sizeof(result.error_message) - 1);
-        return result;
+        return error_result(error.what());
     }
 }

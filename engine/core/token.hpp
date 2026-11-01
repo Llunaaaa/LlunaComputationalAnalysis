@@ -6,6 +6,8 @@ namespace lluna::core {
 
 enum class TokenType {
     Number,
+    Infinity,
+    Degree,
     Identifier,
     Plus,
     Minus,

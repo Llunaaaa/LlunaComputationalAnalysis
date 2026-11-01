@@ -7,12 +7,13 @@
 #include <cstdlib>
 #include <stdexcept>
 #include <cmath>
+#include <utility>
 
 namespace lluna::core {
 
 class Lexer {
 public:
-    explicit Lexer(const std::string& input) : input_(input), pos_(0) {}
+    explicit Lexer(std::string input) : input_(std::move(input)), pos_(0) {}
 
     std::vector<Token> tokenize() {
         std::vector<Token> tokens;
@@ -42,6 +43,21 @@ public:
                     pos_ += 2;
                     continue;
                 }
+            }
+
+            if (static_cast<unsigned char>(ch) == 0xE2 && pos_ + 2 < input_.size() &&
+                static_cast<unsigned char>(input_[pos_ + 1]) == 0x88 &&
+                static_cast<unsigned char>(input_[pos_ + 2]) == 0x9E) {
+                tokens.push_back(Token::make(TokenType::Infinity, "infinity", pos_));
+                pos_ += 3;
+                continue;
+            }
+
+            if (static_cast<unsigned char>(ch) == 0xC2 && pos_ + 1 < input_.size() &&
+                static_cast<unsigned char>(input_[pos_ + 1]) == 0xB0) {
+                tokens.push_back(Token::make(TokenType::Degree, "°", pos_));
+                pos_ += 2;
+                continue;
             }
 
             // Identifiers / words: [a-zA-Z_][a-zA-Z0-9_]*
@@ -109,21 +125,33 @@ private:
         }
     }
 
+    bool digit_at(std::size_t index) const {
+        return index < input_.size() && std::isdigit(static_cast<unsigned char>(input_[index]));
+    }
+
+    // Decimal literal: digits [. digits] [e[+-]digits]. The exponent is only
+    // consumed when digits follow, so "2e" stays 2 * e.
     Token read_number() {
-        std::size_t start = pos_;
-        char* end = nullptr;
-        const char* str_start = input_.c_str() + pos_;
-        double val = std::strtod(str_start, &end);
-        if (end == str_start) {
-            throw std::runtime_error("Expected a number");
+        const std::size_t start = pos_;
+        while (digit_at(pos_)) pos_++;
+        if (pos_ < input_.size() && input_[pos_] == '.') {
+            pos_++;
+            while (digit_at(pos_)) pos_++;
         }
-        if (!std::isfinite(val)) {
+        if (pos_ < input_.size() && (input_[pos_] == 'e' || input_[pos_] == 'E')) {
+            std::size_t exponent = pos_ + 1;
+            if (exponent < input_.size() && (input_[exponent] == '+' || input_[exponent] == '-')) exponent++;
+            if (digit_at(exponent)) {
+                pos_ = exponent;
+                while (digit_at(pos_)) pos_++;
+            }
+        }
+        std::string text = input_.substr(start, pos_ - start);
+        const double value = std::strtod(text.c_str(), nullptr);
+        if (!std::isfinite(value)) {
             throw std::runtime_error("The number is not finite");
         }
-        std::size_t length = static_cast<std::size_t>(end - str_start);
-        std::string num_str = input_.substr(start, length);
-        pos_ += length;
-        return Token::make_number(val, num_str, start);
+        return Token::make_number(value, std::move(text), start);
     }
 
     Token read_identifier() {
@@ -136,7 +164,7 @@ private:
         return Token::make(TokenType::Identifier, id, start);
     }
 
-    const std::string& input_;
+    std::string input_;
     std::size_t pos_;
 };
 

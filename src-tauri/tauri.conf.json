@@ -10,12 +10,14 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "withGlobalTauri": true,
+    "withGlobalTauri": false,
     "windows": [
       {
         "title": "Lluna Computational Analysis",
         "width": 800,
-        "height": 600
+        "height": 600,
+        "label": "main",
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --in-process-gpu --enable-features=NetworkServiceInProcess2"
       }
     ],
     "security": {
