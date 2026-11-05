@@ -201,6 +201,8 @@ void run_audit_regressions() {
     assert_relative_value("sum(x, 1, 2, xpi)", 3.0 * pi);
     assert_relative_value("sum(x, 1, 2, xsin(x))", std::sin(1.0) + 2.0 * std::sin(2.0));
     assert_error("xpi", "Unknown identifier: xpi");
+    assert_error("pi (sum(i, 1, 12, i (prod(i, 1, 3, i ^ (x)))))", "Unknown identifier: x");
+    assert_relative_value("pi (sum(i, 1, 12, i (prod(i, 1, 3, i ^ (2)))))", 2808.0 * pi);
     assert_value("integral(0, 1, e, e)", 0.5);
     assert_value("integral(0, 1, t, t)", 0.5);
     assert_value("sum(i, 1, 3, sum(j, 1, i, j))", 10.0);
@@ -442,6 +444,7 @@ int main() {
     assert_value("limit(x, infinity, 1/x)", 0.0);
     assert_error("int", "Integral requires arguments in parentheses: integral(lower, upper, variable, integrand)");
     assert_error("integral(0, infinity, x, 1/x)", "Infinite bounds are not supported for numerical integration");
+    assert_error("integral(1, 30, x, x^3999)", "Finite result exceeds the native floating-point range");
     assert_approximate("prod(i, 1, 4, i+1)", 0);
     assert_error("sum(i, 5, 2, i)", "Lower bound cannot be greater than upper bound");
     assert_error("sum(i, 1.5, 5, i)", "Lower bound must be an integer");

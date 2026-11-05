@@ -37,6 +37,43 @@ expression per refinement pass to keep interaction bounded and predictable.
 Canvas backing dimensions are scaled by `devicePixelRatio` (capped at 3) for
 sharp rendering without unbounded GPU allocation.
 
+Graph expression rows keep their assigned colors when reordered. Right-clicking
+an expression opens the lightweight color menu with 20 presets and validated
+hex input. Safe affine implicit equations such as `y - x = 3` are normalized
+to an explicit `y = f(x)` curve by `src/cas.ts`; nonlinear rearrangement is
+intentionally left for the future CAS layer.
+
+The Graph UI is split by responsibility:
+
+- [`src/graph/state.ts`](./src/graph/state.ts) owns persistent rows, colors,
+  slider policy, and viewport/options state.
+- [`src/graph/canvas.ts`](./src/graph/canvas.ts) owns the canvas context,
+  adaptive-curve cache, resize observer, pan/zoom/pinch interaction, and
+  animation cleanup.
+- [`src/graph.ts`](./src/graph.ts) composes the section, row editors, menus,
+  and model/canvas callbacks. It does not own canvas drawing or viewport
+  pointer state.
+
+The canvas controller is mounted only while Graph is active and releases its
+observer, animation frame, timers, pointer state, and curve cache on cleanup.
+
+The other frontend domains use the same boundary-first structure:
+
+- `src/expression/` contains the graph evaluator split into types, tokenizing,
+  numeric calculus helpers, function/constant registration, and compilation.
+  `src/expression.ts` is only a compatibility re-export.
+- `src/latex/` contains the LaTeX lexicon, tokenizer, and recursive converter.
+  `src/latexConverter.ts` is only a compatibility re-export.
+- `src/arithmetic/` contains evaluation/IPC state, row rendering, fraction
+  toggles, shared types, and section composition. `src/arithmetic.ts` remains
+  the public entrypoint.
+- `src/graph/` contains the corresponding Graph state, canvas, rows, sliders,
+  reorder controller, color menu, markup, and shared view types.
+
+Compatibility entrypoints are intentionally small: callers do not need to
+know the internal module layout, while each subsystem can be tested and
+optimized without loading or editing unrelated UI code.
+
 ## Development
 
 Install Node.js, Rust, a C++ compiler, and the Windows WebView2 runtime. Then:

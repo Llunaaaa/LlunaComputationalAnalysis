@@ -25,6 +25,8 @@ test('classification of rows', () => {
   assert.deepEqual(classify('y=x^2'), { kind: 'curve', body: 'x ^ (2)' });
   assert.equal(classify('x^2').kind, 'curve');
   assert.equal(classify('x=3').kind, 'vertical');
+  assert.deepEqual(classify('y-x=3'), { kind: 'curve', body: '1*x + 3' });
+  assert.deepEqual(classify('2y+4=x'), { kind: 'curve', body: '0.5*x - 2' });
   assert.deepEqual(classify('a=50'), { kind: 'variable', name: 'a', body: '50', literal: 50 });
   assert.equal(classify('a=-50').literal, -50);
   assert.equal(classify('g=-.5').literal, -0.5);

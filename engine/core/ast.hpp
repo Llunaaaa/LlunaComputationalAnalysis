@@ -179,8 +179,12 @@ private:
 };
 
 inline double evaluate_numeric(const AstNode& node, const EvaluationContext& ctx) {
-    const double value = node.evaluate(ctx).to_double();
-    if (!std::isfinite(value)) throw std::runtime_error("The result is not finite");
+    const NumberValue result = node.evaluate(ctx);
+    const double value = result.to_double();
+    if (!std::isfinite(value)) {
+        if (result.is_large()) throw std::runtime_error("Finite result exceeds the native floating-point range");
+        throw std::runtime_error("The result is not finite");
+    }
     return value;
 }
 
@@ -210,7 +214,9 @@ inline std::optional<Rational> find_rational_approximation(double value, long lo
 // Numerical methods converge to ~1e-12; snap results that are that close to
 // an integer or a small-denominator fraction so 8/3 is recognised as such.
 inline NumberValue make_numerical_result(double value) {
-    if (!std::isfinite(value)) throw std::runtime_error("The result is not finite");
+    if (!std::isfinite(value)) {
+        throw std::runtime_error("Numerical evaluation overflowed before finiteness could be determined");
+    }
     const double scale = std::max(1.0, std::fabs(value));
     if (std::fabs(value) < 1e-12) return NumberValue::make_approx(0.0);
     if (std::fabs(value - std::round(value)) <= 1e-11 * scale) return NumberValue::make_approx(std::round(value));

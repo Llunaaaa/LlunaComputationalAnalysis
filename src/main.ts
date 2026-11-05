@@ -1,8 +1,9 @@
 import './styles.css';
+import { getSettings } from './settings/settingsState.ts';
 
 const sections = [
   'Home', 'Arithmetic', 'Functions', 'Table', 'Graph', 'Algebra', 'Systems',
-  'Trigonometry', 'Matrices', 'Calculus', 'Statistics', 'Probability', 'Geometry', 'Financial',
+  'Trigonometry', 'Matrices', 'Calculus', 'Statistics', 'Probability', 'Geometry', 'Financial', 'Settings',
 ] as const;
 
 type Section = (typeof sections)[number];
@@ -13,18 +14,16 @@ type Render = (page: HTMLElement) => () => void;
 const loaders: Partial<Record<Section, () => Promise<Render>>> = {
   Arithmetic: () => import('./arithmetic.ts').then((module) => module.renderArithmetic),
   Graph: () => import('./graph.ts').then((module) => module.renderGraph),
+  Settings: () => import('./settings/settingsPage.ts').then((module) => module.renderSettings),
 };
 
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('Application root was not found');
+document.documentElement.style.setProperty('--accent', getSettings().ui.accentColor);
 
 app.innerHTML = `
   <main class="app-shell">
     <aside class="sidebar" aria-label="Application sections">
-      <div class="sidebar-heading">
-        <p class="eyebrow logo-mark">LLUNA</p>
-        <h1>Computational Analysis</h1>
-      </div>
       <nav class="section-list">
         ${sections.map((section) => `<button class="section-button" type="button" data-section="${section}">${section}</button>`).join('')}
       </nav>
