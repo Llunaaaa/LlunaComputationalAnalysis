@@ -8,6 +8,7 @@
 
 import { latexToEngine } from './latexConverter.ts';
 import { compileExpression, isReservedName, type Program } from './expression.ts';
+import { normalizeImplicitEquation } from './cas.ts';
 
 export type EntryKind = 'blank' | 'curve' | 'vertical' | 'variable' | 'invalid';
 
@@ -58,6 +59,8 @@ export function classify(latex: string): Classification {
   if (lhs === 'y') return { kind: 'curve', body: rhs };
   if (rhs === 'y') return { kind: 'curve', body: lhs };
   if (lhs === 'x') return { kind: 'vertical', body: rhs };
+  const normalized = normalizeImplicitEquation(engine);
+  if (normalized) return { kind: 'curve', body: normalized.slice(normalized.indexOf('=') + 1).trim() };
   if (!NAME.test(lhs)) return invalid('The left side must be y, x, or a variable name');
   if (isReservedName(lhs)) return invalid(`'${lhs}' is a built-in name and cannot be redefined`);
 

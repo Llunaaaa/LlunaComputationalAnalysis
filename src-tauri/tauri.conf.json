@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Lluna Computational Analysis",
+  "productName": "Computational Analysis",
   "version": "0.1.0",
   "identifier": "com.lluna.computationalanalysis",
   "build": {
@@ -13,7 +13,7 @@
     "withGlobalTauri": false,
     "windows": [
       {
-        "title": "Lluna Computational Analysis",
+        "title": "Computational Analysis",
         "width": 800,
         "height": 600,
         "label": "main",

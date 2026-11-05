@@ -8,7 +8,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "test": "node --test src/expression.test.ts src/graph.test.ts"
+    "test": "node --test src/expression.test.ts src/graph.test.ts src/graph/state.test.ts src/settings/settings.test.ts"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
