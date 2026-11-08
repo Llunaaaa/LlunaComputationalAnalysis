@@ -6,9 +6,9 @@
 // Env layout shared by every compiled program: slot 0 is x, slots 1..n are the
 // variables in `names` order, bound calculus variables follow.
 
-import { latexToEngine } from './latexConverter.ts';
-import { compileExpression, isReservedName, type Program } from './expression.ts';
-import { normalizeImplicitEquation } from './cas.ts';
+import { latexToEngine } from '../general/latex/index.ts';
+import { compileExpression, isReservedName, type Program } from '../general/expression/index.ts';
+import { normalizeImplicitEquation } from '../general/cas.ts';
 
 export type EntryKind = 'blank' | 'curve' | 'vertical' | 'variable' | 'invalid';
 

@@ -1,5 +1,5 @@
-import { defaultViewport, type Viewport } from '../plot.ts';
-import { getSettings } from '../settings/settingsState.ts';
+import { defaultViewport, type Viewport } from './plot.ts';
+import { getSettings } from '../settings/ui/settingsState.ts';
 
 export interface SliderRange {
   min: number;

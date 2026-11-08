@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { GRAPH_PALETTE } from './settingsDefaults.ts';
 import { createMemoryStorage } from './settingsPersistence.ts';
 import { isValidHexColor, SettingsStore } from './settingsState.ts';
-import { filterUnits, UNITS_CATALOG } from './unitsCatalog.ts';
+import { filterUnits, UNITS_CATALOG } from '../units/unitsCatalog.ts';
 
 test('settings use explicit defaults and persist valid updates', () => {
   const storage = createMemoryStorage();
@@ -51,6 +51,7 @@ test('color validation and SI catalog coverage', () => {
   for (const id of ['newton', 'pascal', 'joule', 'watt', 'coulomb', 'volt', 'farad', 'ohm', 'siemens', 'weber', 'tesla', 'henry', 'lumen', 'lux']) {
     assert.ok(UNITS_CATALOG.some((unit) => unit.id === id));
   }
+  for (const id of ['becquerel', 'gray', 'sievert', 'katal']) assert.ok(UNITS_CATALOG.some((unit) => unit.id === id));
   assert.equal(UNITS_CATALOG.filter((unit) => unit.kind === 'prefix').length, 24);
   assert.equal(UNITS_CATALOG.some((unit) => /inch|foot|yard|mile|pound/i.test(unit.name)), false);
   assert.equal(filterUnits('newton')[0].symbol, 'N');

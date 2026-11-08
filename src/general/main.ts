@@ -1,5 +1,6 @@
 import './styles.css';
-import { getSettings } from './settings/settingsState.ts';
+import './fullscreen.ts';
+import { getSettings } from '../settings/ui/settingsState.ts';
 
 const sections = [
   'Home', 'Arithmetic', 'Functions', 'Table', 'Graph', 'Algebra', 'Systems',
@@ -12,9 +13,9 @@ type Render = (page: HTMLElement) => () => void;
 // Sections load on first use, so MathLive and the graph code stay out of
 // memory until they are needed.
 const loaders: Partial<Record<Section, () => Promise<Render>>> = {
-  Arithmetic: () => import('./arithmetic.ts').then((module) => module.renderArithmetic),
-  Graph: () => import('./graph.ts').then((module) => module.renderGraph),
-  Settings: () => import('./settings/settingsPage.ts').then((module) => module.renderSettings),
+  Arithmetic: () => import('../arithmetic/index.ts').then((module) => module.renderArithmetic),
+  Graph: () => import('../graph/index.ts').then((module) => module.renderGraph),
+  Settings: () => import('../settings/ui/settingsPage.ts').then((module) => module.renderSettings),
 };
 
 const app = document.querySelector<HTMLDivElement>('#app');

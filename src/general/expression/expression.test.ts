@@ -1,8 +1,8 @@
 // Run with: npm test   (Node's built-in runner with type stripping)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { latexToEngine, PLACEHOLDER_ERROR } from './latexConverter.ts';
-import { compileExpression, factorial, realPow } from './expression.ts';
+import { latexToEngine, PLACEHOLDER_ERROR } from '../latex/index.ts';
+import { compileExpression, factorial, realPow } from './index.ts';
 
 function value(latex: string, globals: string[] = [], values: number[] = []): number {
   const program = compileExpression(latexToEngine(latex), globals);

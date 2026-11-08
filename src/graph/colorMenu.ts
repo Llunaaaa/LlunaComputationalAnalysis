@@ -1,5 +1,5 @@
-import type { MathfieldElement } from '../mathfield.ts';
-import { getSettings } from '../settings/settingsState.ts';
+import type { MathfieldElement } from '../general/mathfield.ts';
+import { getSettings } from '../settings/ui/settingsState.ts';
 import type { GraphRowView } from './types.ts';
 
 type ColorTarget = Pick<GraphRowView, 'row' | 'root'>;

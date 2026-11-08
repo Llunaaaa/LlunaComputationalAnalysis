@@ -8,13 +8,13 @@
 // - canvas.ts owns all drawing and viewport resources.
 
 import { GraphModel } from './graphModel.ts';
-import { GraphCanvasController } from './graph/canvas.ts';
-import { GraphColorMenu } from './graph/colorMenu.ts';
-import { GRAPH_MARKUP } from './graph/markup.ts';
-import { GraphRowController } from './graph/rows.ts';
-import { ensureTrailingBlank, state, unusedVariableName } from './graph/state.ts';
+import { GraphCanvasController } from './canvas.ts';
+import { GraphColorMenu } from './colorMenu.ts';
+import { GRAPH_MARKUP } from './markup.ts';
+import { GraphRowController } from './rows.ts';
+import { ensureTrailingBlank, state, unusedVariableName } from './state.ts';
 
-export { SLIDER_DECIMAL_PLACES } from './graph/state.ts';
+export { SLIDER_DECIMAL_PLACES } from './state.ts';
 
 export function renderGraph(container: HTMLElement): () => void {
   if (state.rows.length === 0) ensureTrailingBlank();

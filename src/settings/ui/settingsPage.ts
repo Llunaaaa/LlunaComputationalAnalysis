@@ -1,6 +1,8 @@
 import { settingsStore } from './settingsState.ts';
 import { SETTINGS_TABS, type SettingsTabId } from './settingsTabs.ts';
 import { createSettingsColorPicker } from './colorPicker.ts';
+import { filterUnits } from '../units/unitsCatalog.ts';
+import { renderUnitRows } from './settingsTabs.ts';
 import type { AppSettings } from './settingsTypes.ts';
 
 function applyUI(settings: AppSettings): void {
@@ -44,6 +46,21 @@ export function renderSettings(container: HTMLElement): () => void {
       const value = input.type === 'checkbox' ? input.checked : input.type === 'range' ? Number(input.value) : input.value;
       settingsStore.updateCategory('graphing', { [key]: value });
     });
+    const unitSearch = content.querySelector<HTMLInputElement>('[data-unit-search]');
+    const unitCategory = content.querySelector<HTMLSelectElement>('[data-unit-category]');
+    const unitKind = content.querySelector<HTMLSelectElement>('[data-unit-kind]');
+    const unitList = content.querySelector<HTMLTableSectionElement>('[data-unit-list="units"]');
+    const prefixList = content.querySelector<HTMLTableSectionElement>('[data-unit-list="prefixes"]');
+    const updateUnits = (): void => {
+      const query = unitSearch?.value ?? '';
+      const category = unitCategory?.value ?? 'all';
+      const kind = unitKind?.value ?? 'all';
+      if (unitList) unitList.innerHTML = renderUnitRows(filterUnits(query, category === 'SI prefix' ? 'none' : category, kind === 'prefix' ? 'none' : kind));
+      if (prefixList) prefixList.innerHTML = renderUnitRows(filterUnits(query, 'SI prefix', kind === 'base' || kind === 'derived' ? 'none' : 'prefix'));
+    };
+    unitSearch?.addEventListener('input', updateUnits);
+    unitCategory?.addEventListener('change', updateUnits);
+    unitKind?.addEventListener('change', updateUnits);
     for (const button of Array.from(content.querySelectorAll<HTMLButtonElement>('[data-settings-color]'))) {
       const key = button.dataset.settingsColor!;
       const picker = createSettingsColorPicker((color) => {

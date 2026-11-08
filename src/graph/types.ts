@@ -1,4 +1,4 @@
-import type { MathfieldElement } from '../mathfield.ts';
+import type { MathfieldElement } from '../general/mathfield.ts';
 import type { GraphRow } from './state.ts';
 
 export interface SliderView {

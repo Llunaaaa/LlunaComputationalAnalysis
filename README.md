@@ -16,12 +16,16 @@ affiliated with, or endorsed by Desmos.
 TypeScript UI -> Tauri command -> Rust FFI -> C++ math engine
 ```
 
-- `src/` contains the TypeScript and CSS frontend.
+- `src/` contains only section folders and the shared `general/` frontend
+  folder. `general/` owns app composition, shared styling, MathLive setup,
+  shared expression/LaTeX infrastructure, and common UI behavior. Each
+  calculator section has its own folder, even when that section is currently
+  a placeholder.
 - `src-tauri/` contains the Tauri and Rust application layer.
 - `engine/` contains the C++ expression evaluator and C-compatible API.
 
 The Graph section intentionally uses a separate, synchronous frontend sampling
-path in [`src/graph.ts`](./src/graph.ts). The scalar native command remains the
+path in [`src/graph/`](./src/graph/). The scalar native command remains the
 source of truth for calculator results, while graph interaction avoids routing
 thousands of individual samples through Tauri. The graph evaluator supports
 `x`, `pi`, `e`, arithmetic, powers, radians, degree postfix notation, and the
@@ -40,7 +44,7 @@ sharp rendering without unbounded GPU allocation.
 Graph expression rows keep their assigned colors when reordered. Right-clicking
 an expression opens the lightweight color menu with 20 presets and validated
 hex input. Safe affine implicit equations such as `y - x = 3` are normalized
-to an explicit `y = f(x)` curve by `src/cas.ts`; nonlinear rearrangement is
+to an explicit `y = f(x)` curve by `src/general/cas.ts`; nonlinear rearrangement is
 intentionally left for the future CAS layer.
 
 The Graph UI is split by responsibility:
@@ -50,7 +54,7 @@ The Graph UI is split by responsibility:
 - [`src/graph/canvas.ts`](./src/graph/canvas.ts) owns the canvas context,
   adaptive-curve cache, resize observer, pan/zoom/pinch interaction, and
   animation cleanup.
-- [`src/graph.ts`](./src/graph.ts) composes the section, row editors, menus,
+- [`src/graph/index.ts`](./src/graph/index.ts) composes the section, row editors, menus,
   and model/canvas callbacks. It does not own canvas drawing or viewport
   pointer state.
 
@@ -59,16 +63,20 @@ observer, animation frame, timers, pointer state, and curve cache on cleanup.
 
 The other frontend domains use the same boundary-first structure:
 
-- `src/expression/` contains the graph evaluator split into types, tokenizing,
+- `src/general/expression/` contains the graph evaluator split into types, tokenizing,
   numeric calculus helpers, function/constant registration, and compilation.
-  `src/expression.ts` is only a compatibility re-export.
-- `src/latex/` contains the LaTeX lexicon, tokenizer, and recursive converter.
-  `src/latexConverter.ts` is only a compatibility re-export.
+- `src/general/latex/` contains the LaTeX lexicon, tokenizer, and recursive
+  converter.
 - `src/arithmetic/` contains evaluation/IPC state, row rendering, fraction
-  toggles, shared types, and section composition. `src/arithmetic.ts` remains
-  the public entrypoint.
+  toggles, shared types, and section composition.
 - `src/graph/` contains the corresponding Graph state, canvas, rows, sliders,
   reorder controller, color menu, markup, and shared view types.
+- `src/settings/` contains the versioned settings model, persistence,
+  catalogs, tab renderers, and settings-specific color picker.
+- `src/home/`, `src/functions/`, `src/table/`, `src/algebra/`,
+  `src/systems/`, `src/trigonometry/`, `src/matrices/`, `src/calculus/`,
+  `src/statistics/`, `src/probability/`, `src/geometry/`, and
+  `src/financial/` are reserved section boundaries for future implementations.
 
 Compatibility entrypoints are intentionally small: callers do not need to
 know the internal module layout, while each subsystem can be tested and

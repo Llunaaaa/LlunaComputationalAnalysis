@@ -1,4 +1,4 @@
-import { createMathfield, type MathfieldElement } from '../mathfield.ts';
+import { createMathfield, type MathfieldElement } from '../general/mathfield.ts';
 import { createFractionToggle } from './fractionToggle.ts';
 import { MIN_ROWS, removeRow, updateRow } from './state.ts';
 import type { Row } from './types.ts';

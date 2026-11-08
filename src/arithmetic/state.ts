@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { latexToEngine } from '../latexConverter.ts';
+import { latexToEngine } from '../general/latex/index.ts';
 import type { Evaluation, Row } from './types.ts';
 
 export const MIN_ROWS = 2;

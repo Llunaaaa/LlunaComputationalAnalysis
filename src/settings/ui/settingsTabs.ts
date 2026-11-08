@@ -1,5 +1,6 @@
 import { settingsStore } from './settingsState.ts';
 import type { AppSettings } from './settingsTypes.ts';
+import { filterUnits, type UnitDefinition } from '../units/unitsCatalog.ts';
 
 export type SettingsTabId = 'ui' | 'performance' | 'constants' | 'units' | 'equations' | 'graphing';
 export interface SettingsTab {
@@ -44,7 +45,21 @@ function renderConstants(): string {
 }
 
 function renderUnits(): string {
-  return '<div class="settings-placeholder"><p>Units settings will be redesigned in a future update.</p></div>';
+  return `<div class="units-catalog">
+    <div class="units-toolbar">
+      <label class="settings-search">Search units <input data-unit-search type="search" placeholder="Search quantity, unit, symbol, or expression"></label>
+      <label>Category<select data-unit-category><option value="all">All units</option><option value="SI base">SI base</option><option value="SI derived">SI derived</option><option value="SI prefix">SI prefixes</option></select></label>
+      <label>Kind<select data-unit-kind><option value="all">All kinds</option><option value="base">Base</option><option value="derived">Derived</option><option value="prefix">Prefix</option></select></label>
+    </div>
+    <h3 class="units-section-label">UNITS</h3>
+    <div class="units-table-wrap" data-unit-table="units"><table class="units-table"><thead><tr><th>Physical Quantity</th><th>Unit Name</th><th>Symbol</th><th>Expression in Base Units / Other Units</th></tr></thead><tbody data-unit-list="units">${renderUnitRows(filterUnits('', 'all', 'base').concat(filterUnits('', 'all', 'derived')))}</tbody></table></div>
+    <h3 class="units-section-label">PREFIXES</h3>
+    <div class="units-table-wrap" data-unit-table="prefixes"><table class="units-table"><thead><tr><th>Prefix</th><th>Unit Name</th><th>Symbol</th><th>Expression in Base Units / Other Units</th></tr></thead><tbody data-unit-list="prefixes">${renderUnitRows(filterUnits('', 'SI prefix', 'prefix'))}</tbody></table></div>
+  </div>`;
+}
+
+function renderUnitRows(units: readonly UnitDefinition[]): string {
+  return units.map((unit) => `<tr><td>${unit.quantity}</td><td>${unit.name}</td><td><code>${unit.symbol}</code></td><td><code>${unit.expression}</code></td></tr>`).join('');
 }
 
 function renderEquations(): string {
@@ -72,4 +87,4 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   { id: 'graphing', label: 'Graphing', render: renderGraphing },
 ];
 
-export { settingsStore };
+export { renderUnitRows, settingsStore };

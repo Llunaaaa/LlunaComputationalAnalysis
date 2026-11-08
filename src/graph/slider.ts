@@ -1,4 +1,4 @@
-import type { Entry, GraphModel } from '../graphModel.ts';
+import type { Entry, GraphModel } from './graphModel.ts';
 import { defaultRange, snap } from './state.ts';
 import type { GraphRowView, SliderView } from './types.ts';
 

@@ -1,10 +1,11 @@
-import { GraphModel } from '../graphModel.ts';
+import { GraphModel } from './graphModel.ts';
 import {
   defaultViewport, formatTick, generateTicks, graphToScreen, panViewport, sampleCurve,
   screenToGraph, tickStep, zoomAroundCursor, type Viewport,
-} from '../plot.ts';
-import type { Program } from '../expression.ts';
-import { getSettings } from '../settings/settingsState.ts';
+} from './plot.ts';
+import type { Program } from '../general/expression/index.ts';
+import { subscribeFullscreen, toggleFullscreen } from '../general/fullscreen.ts';
+import { getSettings } from '../settings/ui/settingsState.ts';
 import type { GraphRow, GraphState } from './state.ts';
 
 const BUTTON_ZOOM = 1.5;
@@ -48,6 +49,8 @@ export class GraphCanvasController {
   private interacting = false;
   private lastDrawMs = 0;
   private pinchDistance = 0;
+  private readonly fullscreenButton: HTMLButtonElement | null;
+  private unsubscribeFullscreen: (() => void) | null = null;
 
   constructor(options: CanvasControllerOptions) {
     this.canvas = options.canvas;
@@ -59,6 +62,7 @@ export class GraphCanvasController {
     this.model = options.model;
     this.getRow = options.getRow;
     this.ctx = this.canvas.getContext('2d', { alpha: false })!;
+    this.fullscreenButton = this.workspace.querySelector<HTMLButtonElement>('[data-action="fullscreen"]');
     this.gridToggle.checked = this.state.showGrid;
     this.axesToggle.checked = this.state.showAxes;
   }
@@ -71,7 +75,8 @@ export class GraphCanvasController {
     this.canvasWrap.addEventListener('wheel', this.onWheel, { passive: false });
     this.gridToggle.addEventListener('change', this.onGridChange);
     this.axesToggle.addEventListener('change', this.onAxesChange);
-    this.workspace.querySelector('[data-action="fullscreen"]')?.addEventListener('click', this.toggleFullscreen);
+    this.fullscreenButton?.addEventListener('click', this.toggleFullscreen);
+    this.unsubscribeFullscreen = subscribeFullscreen(this.updateFullscreenButton);
     this.workspace.querySelector('[data-action="reset"]')?.addEventListener('click', this.reset);
     this.workspace.querySelector('[data-action="zoom-in"]')?.addEventListener('click', this.zoomIn);
     this.workspace.querySelector('[data-action="zoom-out"]')?.addEventListener('click', this.zoomOut);
@@ -102,7 +107,9 @@ export class GraphCanvasController {
     this.axesToggle.removeEventListener('change', this.onAxesChange);
     window.clearTimeout(this.settleTimer);
     cancelAnimationFrame(this.frame);
-    if (document.fullscreenElement === this.workspace) void document.exitFullscreen();
+    this.fullscreenButton?.removeEventListener('click', this.toggleFullscreen);
+    this.unsubscribeFullscreen?.();
+    this.unsubscribeFullscreen = null;
     this.pointers.clear();
     this.curves.clear();
   }
@@ -280,8 +287,14 @@ export class GraphCanvasController {
   };
 
   private readonly toggleFullscreen = (): void => {
-    if (document.fullscreenElement === this.workspace) void document.exitFullscreen();
-    else void this.workspace.requestFullscreen();
+    toggleFullscreen();
+  };
+
+  private readonly updateFullscreenButton = (isFullscreen: boolean): void => {
+    if (!this.fullscreenButton) return;
+    this.fullscreenButton.setAttribute('aria-pressed', String(isFullscreen));
+    this.fullscreenButton.title = isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen';
+    this.fullscreenButton.setAttribute('aria-label', isFullscreen ? 'Exit fullscreen graph' : 'Enter fullscreen graph');
   };
 
   private readonly reset = (): void => {

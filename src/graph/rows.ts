@@ -1,5 +1,5 @@
-import { createMathfield } from '../mathfield.ts';
-import { GraphModel, type Entry } from '../graphModel.ts';
+import { createMathfield } from '../general/mathfield.ts';
+import { GraphModel, type Entry } from './graphModel.ts';
 import { GraphColorMenu } from './colorMenu.ts';
 import { applyEntrySlider } from './slider.ts';
 import { ExpressionReorderController } from './reorder.ts';
