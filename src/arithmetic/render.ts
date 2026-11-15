@@ -1,5 +1,6 @@
 import { createRowView, type RowView } from './rows.ts';
 import { paintFractionToggle } from './fractionToggle.ts';
+import { formatEvaluation } from './presentation.ts';
 import {
   MIN_ROWS,
   enforceInvariants,
@@ -36,10 +37,8 @@ export function renderArithmetic(page: HTMLElement): () => void {
       el.textContent = `Error: ${evaluation.error}`;
     } else if (evaluation) {
       const fraction = row.showFraction && !view.fraction.disabled;
-      const text = fraction
-        ? evaluation.exact
-        : evaluation.display_value || evaluation.exact || (evaluation.value === null ? '' : String(evaluation.value));
-      el.textContent = text ? `${!fraction && evaluation.is_approximate ? '≈' : '='} ${text}` : '';
+      const formatted = formatEvaluation(evaluation, fraction);
+      el.textContent = formatted.text ? `${formatted.isApproximate ? '≈' : '='} ${formatted.text}` : '';
     } else {
       el.textContent = '';
     }

@@ -166,6 +166,15 @@ mod tests {
         let r2 = evaluate("3 * integral(0, 2, x, x^2)".to_owned()).expect("evaluation should succeed");
         assert_eq!(r2.value, Some(8.0));
 
+        let r_exact = evaluate("integral(2, 4, x, x^3)".to_owned()).expect("evaluation should succeed");
+        assert_eq!(r_exact.value, Some(60.0));
+        assert_eq!(r_exact.exact.as_deref(), Some("60"));
+        assert_eq!(r_exact.is_approximate, false);
+
+        let power_exact = evaluate("3^(2-6)".to_owned()).expect("evaluation should succeed");
+        assert_eq!(power_exact.exact.as_deref(), Some("1/81"));
+        assert_eq!(power_exact.is_approximate, false);
+
         let r3 = evaluate("derivative(x, 3, x^2)".to_owned()).expect("evaluation should succeed");
         assert_eq!(r3.value, Some(6.0));
 

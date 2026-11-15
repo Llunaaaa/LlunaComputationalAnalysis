@@ -664,6 +664,14 @@ html:fullscreen .graph-workspace {
 .units-toolbar .settings-search { margin-bottom: 0; }
 .units-toolbar > label:not(.settings-search) { display: grid; gap: 7px; color: var(--light-gray); font-size: .82rem; font-weight: 600; }
 .units-toolbar select { width: 100%; border: 1px solid #363a36; border-radius: 6px; background: #111411; color: var(--white); padding: 8px; }
+.settings-action-button { border: 1px solid #363a36; border-radius: 6px; background: #111411; color: var(--light-gray); cursor: pointer; padding: 8px 11px; }
+.settings-action-button:hover { border-color: #687067; color: var(--white); }
+.unit-editor { display: grid; grid-template-columns: repeat(3, minmax(150px, 1fr)); gap: 10px; border: 1px solid #202420; border-radius: 10px; background: var(--panel); padding: 14px; }
+.unit-editor[hidden] { display: none; }
+.unit-editor label { display: grid; gap: 6px; color: var(--light-gray); font-size: .8rem; font-weight: 600; }
+.unit-editor input, .unit-editor select { min-width: 0; border: 1px solid #363a36; border-radius: 6px; background: #111411; color: var(--white); padding: 8px; }
+.unit-editor > div { display: flex; align-items: end; gap: 8px; }
+.settings-form-error { grid-column: 1 / -1; min-height: 1em; margin: 0; color: #c98080; font-size: .78rem; }
 .units-table-wrap { overflow-x: auto; overflow-y: visible; border: 1px solid #202420; border-radius: 10px; background: #0b0d0b; scrollbar-color: #3a443a #0b0d0b; scrollbar-width: thin; }
 .units-table-wrap::-webkit-scrollbar { height: 9px; }
 .units-table-wrap::-webkit-scrollbar-track { background: #0b0d0b; }
@@ -675,6 +683,12 @@ html:fullscreen .graph-workspace {
 .units-table tbody tr:hover { background: #121612; }
 .units-table td:nth-child(2) { color: var(--white); }
 .units-table td:nth-child(3) { color: var(--accent); font-weight: 700; }
+.units-table td:first-child { width: 64px; text-align: center; }
+.units-table td:first-child input { accent-color: var(--accent); }
+.units-table .unit-disabled { opacity: .42; }
+.units-table button { border: 1px solid #363a36; border-radius: 5px; background: transparent; color: var(--gray); cursor: pointer; margin-right: 5px; padding: 4px 7px; }
+.units-table button:hover { color: var(--white); border-color: #687067; }
+.units-table th:last-child, .units-table td:last-child { width: 1%; min-width: 150px; white-space: nowrap; text-align: right; }
 .units-table code { color: inherit; font-family: "Cascadia Mono", Consolas, monospace; white-space: pre-wrap; }
 html[data-density="compact"] .settings-control, html[data-density="compact"] .settings-check { padding: 11px; }
 html[data-font-scale="small"] { font-size: 14px; }

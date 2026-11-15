@@ -6,6 +6,7 @@
 #include <array>
 #include <cmath>
 #include <memory>
+#include <map>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -45,6 +46,7 @@ class NumberNode : public AstNode {
 public:
     NumberNode(const std::string& text, double value) : value_(NumberValue::from_literal(text, value)) {}
     NumberValue evaluate(const EvaluationContext&) const override { return value_; }
+    const NumberValue& value() const { return value_; }
 
 private:
     NumberValue value_;
@@ -77,6 +79,7 @@ public:
         if (const auto* value = ctx.get_variable(name_)) return *value;
         throw std::runtime_error("Unknown identifier: " + name_);
     }
+    const std::string& name() const { return name_; }
 
 private:
     std::string name_;
@@ -105,6 +108,7 @@ public:
         value.negate();
         return value;
     }
+    const AstNode& operand() const { return *operand_; }
 
 private:
     NodePtr operand_;
@@ -152,6 +156,10 @@ public:
         }
         throw std::runtime_error("Unknown binary operator");
     }
+
+    char op() const { return op_; }
+    const AstNode& left() const { return *left_; }
+    const AstNode& right() const { return *right_; }
 
 private:
     char op_;
@@ -228,6 +236,84 @@ inline NumberValue make_numerical_result(double value) {
 
 inline bool is_infinity(const AstNode& node) { return dynamic_cast<const InfinityNode*>(&node) != nullptr; }
 
+using Polynomial = std::map<int, NumberValue>;
+
+inline std::optional<Polynomial> exact_polynomial(const AstNode& node, const std::string& variable) {
+    if (const auto* number = dynamic_cast<const NumberNode*>(&node)) {
+        return Polynomial{{0, number->value()}};
+    }
+    if (const auto* value = dynamic_cast<const VariableNode*>(&node)) {
+        if (value->name() == variable) return Polynomial{{1, NumberValue(1)}};
+        return std::nullopt;
+    }
+    if (const auto* negate_node = dynamic_cast<const NegateNode*>(&node)) {
+        auto polynomial = exact_polynomial(negate_node->operand(), variable);
+        if (!polynomial) return std::nullopt;
+        for (auto& [degree, coefficient] : *polynomial) coefficient.negate();
+        return polynomial;
+    }
+    const auto* binary = dynamic_cast<const BinaryOpNode*>(&node);
+    if (!binary) return std::nullopt;
+    auto left = exact_polynomial(binary->left(), variable);
+    auto right = exact_polynomial(binary->right(), variable);
+    if (binary->op() == '+' || binary->op() == '-') {
+        if (!left || !right) return std::nullopt;
+        if (binary->op() == '-') for (auto& [degree, coefficient] : *right) coefficient.negate();
+        for (const auto& [degree, coefficient] : *right) {
+            auto found = left->find(degree);
+            if (found == left->end()) (*left)[degree] = coefficient;
+            else found->second = add(found->second, coefficient);
+        }
+        return left;
+    }
+    if (binary->op() == '*') {
+        if (!left || !right) return std::nullopt;
+        Polynomial result;
+        for (const auto& [left_degree, left_coefficient] : *left)
+            for (const auto& [right_degree, right_coefficient] : *right)
+                result[left_degree + right_degree] = result.count(left_degree + right_degree)
+                    ? add(result[left_degree + right_degree], multiply(left_coefficient, right_coefficient))
+                    : multiply(left_coefficient, right_coefficient);
+        return result;
+    }
+    if (binary->op() == '/') {
+        if (!left || !right || right->size() != 1 || !right->count(0)) return std::nullopt;
+        Polynomial result;
+        for (const auto& [degree, coefficient] : *left) result[degree] = divide(coefficient, right->at(0));
+        return result;
+    }
+    if (binary->op() == '^' && left && right && right->size() == 1 && right->count(0)) {
+        const auto exponent = right->at(0);
+        if (!exponent.is_integer() || exponent.to_integer() < 0 || exponent.to_integer() > 32) return std::nullopt;
+        Polynomial result{{0, NumberValue(1)}};
+        for (long long count = 0; count < exponent.to_integer(); ++count) {
+            Polynomial next;
+            for (const auto& [left_degree, left_coefficient] : result)
+                for (const auto& [right_degree, right_coefficient] : *left)
+                    next[left_degree + right_degree] = next.count(left_degree + right_degree)
+                        ? add(next[left_degree + right_degree], multiply(left_coefficient, right_coefficient))
+                        : multiply(left_coefficient, right_coefficient);
+            result = std::move(next);
+        }
+        return result;
+    }
+    return std::nullopt;
+}
+
+inline std::optional<NumberValue> exact_polynomial_integral(const AstNode& integrand, const std::string& variable,
+                                                            const NumberValue& lower, const NumberValue& upper) {
+    if (!lower.is_exact() || !upper.is_exact()) return std::nullopt;
+    const auto polynomial = exact_polynomial(integrand, variable);
+    if (!polynomial) return std::nullopt;
+    NumberValue result(0);
+    for (const auto& [degree, coefficient] : *polynomial) {
+        const NumberValue exponent(degree + 1);
+        const NumberValue scale = divide(coefficient, exponent);
+        result = add(result, multiply(scale, subtract(power(upper, exponent), power(lower, exponent))));
+    }
+    return result;
+}
+
 class DefiniteIntegralNode : public AstNode {
 public:
     DefiniteIntegralNode(NodePtr lower, NodePtr upper, std::string variable, NodePtr integrand)
@@ -241,6 +327,9 @@ public:
         const double lower = evaluate_numeric(*lower_, ctx);
         const double upper = evaluate_numeric(*upper_, ctx);
         if (lower == upper) return NumberValue(0);
+        if (const auto exact = exact_polynomial_integral(*integrand_, variable_, lower_->evaluate(ctx), upper_->evaluate(ctx))) {
+            return *exact;
+        }
         if (std::fabs(upper - lower) > 1e7) throw std::runtime_error("Integral interval is too large");
 
         const Sampler f{*this, ctx};

@@ -3,11 +3,23 @@ export interface UnitDefinition {
   quantity: string;
   name: string;
   symbol: string;
-  category: 'SI base' | 'SI derived' | 'SI prefix';
+  category: string;
   kind: 'base' | 'derived' | 'prefix';
   dimensions: Record<string, number>;
   expression: string;
   formula?: string;
+  enabled: boolean;
+  builtIn: boolean;
+  customized?: boolean;
+  original?: {
+    quantity: string;
+    name: string;
+    symbol: string;
+    expression: string;
+    category: string;
+    kind: UnitDefinition['kind'];
+    enabled: boolean;
+  };
 }
 
 const base: UnitDefinition[] = [
@@ -20,7 +32,7 @@ const base: UnitDefinition[] = [
   ['candela', 'Luminous Intensity', 'candela', 'cd'],
 ].map(([id, quantity, name, symbol]) => ({
   id, quantity, name, symbol, category: 'SI base' as const, kind: 'base' as const,
-  dimensions: { [id]: 1 }, expression: '∅',
+  dimensions: { [id]: 1 }, expression: 'null', enabled: true, builtIn: true,
 }));
 
 const derivedData: [string, string, string, string, string][] = [
@@ -50,7 +62,7 @@ const derivedData: [string, string, string, string, string][] = [
 
 const derived = derivedData.map(([id, quantity, name, symbol, expression]) => ({
   id, quantity, name, symbol, category: 'SI derived' as const, kind: 'derived' as const,
-  dimensions: {}, expression,
+  dimensions: {}, expression, enabled: true, builtIn: true,
 }));
 
 const prefixes: [string, string, string][] = [
@@ -67,7 +79,7 @@ export const UNITS_CATALOG: readonly UnitDefinition[] = [
   ...derived,
   ...prefixes.map(([id, symbol, expression]) => ({
     id, quantity: 'SI Prefix', name: id, symbol, category: 'SI prefix' as const,
-    kind: 'prefix' as const, dimensions: {}, expression,
+    kind: 'prefix' as const, dimensions: {}, expression, enabled: true, builtIn: true,
   })),
 ];
 
