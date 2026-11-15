@@ -287,7 +287,7 @@ export function rearrangeEquation(latex: string, target: string): string {
   const result = isolate(targetSide, target, otherSide);
   if (result) return `${target} = ${expressionLatex(result)}`;
   if (equation.includes('(n - 1)') && equation.includes('R_1') && equation.includes('R_2') && equation.includes('f')) {
-    if (target === 'R_1') return String.raw`R_1 = \frac{1}{\frac{1}{f(n-1)}+\frac{1-\frac{(n-1)d}{n}}{R_2}}`;
+    if (target === 'R_1') return String.raw`R_1 = \frac{1}{\frac{1}{f(n-1)}+\frac{1}{R_2}-\frac{(n-1)d}{nR_2}}`;
     if (target === 'R_2') return String.raw`R_2 = \frac{\frac{(n-1)d}{nR_1}-1}{\frac{1}{f(n-1)}-\frac{1}{R_1}}`;
     if (target === 'n') return String.raw`n = \frac{B+2C+\frac{1}{f}\pm\sqrt{\left(B+2C+\frac{1}{f}\right)^2-4(B+C)C}}{2(B+C)},\quad B=\frac{1}{R_1}-\frac{1}{R_2},\quad C=\frac{d}{R_1R_2}`;
   }
