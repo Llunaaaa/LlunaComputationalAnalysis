@@ -6,17 +6,17 @@ type AlgebraTab = 'simplify' | 'rearrange';
 const REARRANGE_EXAMPLE = '\\frac{1}{f}=(n-1)\\left(\\frac{1}{R_1}-\\frac{1}{R_2}+\\frac{(n-1)d}{nR_1R_2}\\right)';
 
 function readableFractions(latex: string): string {
-  return latex.replace(/\\(?:d?frac)\b/g, '\\cfrac');
+  return latex.replace(/\\(?:cfrac|frac|tfrac)\b/g, '\\dfrac');
 }
 
 function createAlgebraField(className: string, label: string, latex = ''): MathfieldElement {
   const field = createMathfield(className, label);
   field.minFontScale = 0.9;
-  // Typed fractions use \cfrac too, so nested towers keep full-size numerators and denominators.
+  // Display-style fractions keep nested numerators and denominators readable without shifting their baseline.
   field.addEventListener('mount', () => {
     field.keybindings = [
       ...field.keybindings.filter((binding) => !(binding.key === '/' && binding.ifMode === 'math')),
-      { key: '/', ifMode: 'math', command: ['insert', '\\cfrac{#@}{#?}'] },
+      { key: '/', ifMode: 'math', command: ['insert', '\\dfrac{#@}{#?}'] },
     ];
   }, { once: true });
   field.addEventListener('paste', (event) => {
