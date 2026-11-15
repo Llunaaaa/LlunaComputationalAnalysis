@@ -195,7 +195,7 @@ h1 {
 .algebra-result strong { color: var(--light-gray); font-weight: 500; }
 .algebra-result small { color: var(--gray); }
 .algebra-target-label { display: flex; align-items: center; gap: 8px; }
-.algebra-target-label select { border: 1px solid #363a36; border-radius: 6px; background: #111411; color: var(--white); padding: 7px 10px; }
+.algebra-target-label input { width: 90px; border: 1px solid #363a36; border-radius: 6px; background: #111411; color: var(--white); padding: 7px 10px; font: inherit; }
 
 /* ========================================================
    Arithmetic Workspace - Inverted Bottom-Left Push-Up Stack

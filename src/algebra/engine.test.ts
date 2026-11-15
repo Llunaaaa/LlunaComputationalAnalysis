@@ -27,7 +27,17 @@ test('rearranges the initial reciprocal lens-equation form for f', () => {
 });
 
 test('reports unsupported rearrangement targets explicitly', () => {
-  assert.throws(() => rearrangeEquation('1/f = x + 1', 'x'), /not supported yet/);
+  assert.throws(() => rearrangeEquation('y = x^2', 'x'), /not supported/);
+});
+
+test('rearranges general additive, multiplicative, and fractional equations', () => {
+  assert.equal(rearrangeEquation('y = m*x + b', 'x'), 'x = \\frac{y - b}{m}');
+  assert.equal(rearrangeEquation('a = 3x + 2', 'x'), 'x = \\frac{a - 2}{3}');
+  assert.equal(rearrangeEquation('p = (x - 4) / k', 'x'), 'x = p * k + 4');
+});
+
+test('rearranges equations containing arbitrary variable names', () => {
+  assert.equal(rearrangeEquation('total = rate * time', 'time'), 'time = \\frac{total}{rate}');
 });
 
 test('rearranges every target in the default lens equation', () => {
