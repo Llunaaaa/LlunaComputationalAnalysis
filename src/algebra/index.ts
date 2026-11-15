@@ -89,7 +89,9 @@ export function renderAlgebra(container: HTMLElement): () => void {
         target.value = detected.includes(selected) ? selected : detected[0] || '';
       };
       field.addEventListener('input', updateVariables);
+      field.addEventListener('mount', updateVariables, { once: true });
       updateVariables();
+      queueMicrotask(updateVariables);
       const outputHost = content.querySelector<HTMLDivElement>('.algebra-result-host')!;
       outputField = createAlgebraField('algebra-expression-field algebra-result-field', 'Rearranged equation');
       outputField.setAttribute('readonly', '');
