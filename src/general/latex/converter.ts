@@ -291,6 +291,17 @@ class Converter {
       if (!/^[a-zA-Z]+$/.test(text)) throw new Error(`Unsupported notation: \\${name}{${text}}`);
       return FUNCTIONS.has(text) ? this.functionCall(text) : this.word(text);
     }
+    if (name === 'cfrac') {
+      this.skipSpacing();
+      if (isChar(this.peek(), '[')) {
+        this.pos += 1;
+        const alignment = this.next();
+        if (!(isChar(alignment, 'l') || isChar(alignment, 'r')) || !isChar(this.next(), ']')) {
+          throw new Error('Invalid continued fraction alignment');
+        }
+      }
+      return this.fraction();
+    }
     if (name === 'frac' || name === 'dfrac' || name === 'tfrac') return this.fraction();
     if (name === 'binom' || name === 'dbinom') {
       const n = this.sub(this.rawArgument());

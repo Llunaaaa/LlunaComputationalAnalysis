@@ -14,6 +14,7 @@ type Render = (page: HTMLElement) => () => void;
 // memory until they are needed.
 const loaders: Partial<Record<Section, () => Promise<Render>>> = {
   Arithmetic: () => import('../arithmetic/index.ts').then((module) => module.renderArithmetic),
+  Algebra: () => import('../algebra/index.ts').then((module) => module.renderAlgebra),
   Graph: () => import('../graph/index.ts').then((module) => module.renderGraph),
   Settings: () => import('../settings/ui/settingsPage.ts').then((module) => module.renderSettings),
 };

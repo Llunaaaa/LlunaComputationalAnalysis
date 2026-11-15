@@ -49,6 +49,18 @@ Graph sampling runs in the frontend so interaction does not route thousands of
 sample evaluations through Tauri. Scalar calculator results remain owned by the
 native engine.
 
+### Algebra
+
+- **Simplify** distributes products, combines like terms, and expands
+  non-negative integer powers for supported single-variable expressions.
+  Equations are simplified on each side without solving them.
+- **Rearrange** provides an editable base equation and a read-only mathematical
+  result, with initial support for the supplied lens equation's variables.
+  General symbolic rearrangement is still planned.
+- Equation fields stay compact for ordinary expressions and grow vertically
+  with tall notation. Nested fractions use display-style spacing and a minimum
+  symbol size; wide equations scroll horizontally rather than shrinking.
+
 ### Settings
 
 The Settings section currently includes six tabs:

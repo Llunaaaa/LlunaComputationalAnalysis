@@ -50,6 +50,15 @@ test('converter errors', () => {
   assert.throws(() => latexToEngine('\\sum_{1}^{3} i'), /requires an index/);
 });
 
+test('readable continued fractions preserve mathematical expressions', () => {
+  const formatted = String.raw`\cfrac{1}{\cfrac{x+2}{y-3}}`;
+  assert.equal(latexToEngine(formatted), latexToEngine(String.raw`\frac{1}{\frac{x+2}{y-3}}`));
+  for (const alignment of ['', '[l]', '[r]']) {
+    near(value(`\\cfrac${alignment}{15}{36}`), 15 / 36);
+  }
+  assert.throws(() => latexToEngine(String.raw`\cfrac[z]{1}{2}`), /Invalid continued fraction alignment/);
+});
+
 test('arithmetic values', () => {
   near(value('\\prod_{i=3}^{19}i^{2}'), (factorial(19) / 2) ** 2, 1e-12);
   near(value('\\sum_{k=1}^{100}\\frac{1}{k^2}'), 1.6349839001848923);
