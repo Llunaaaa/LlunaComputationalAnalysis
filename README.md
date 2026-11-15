@@ -195,7 +195,7 @@ src-tauri/target/release/bundle/
 
 ## Project status
 
-Computational Analysis is an actively evolving prototype. Arithmetic and
+LCA is an actively evolving prototype. Arithmetic and
 graphing form the primary working vertical slice. Several sidebar sections are
 reserved for future tools, and unit definitions are currently a catalog and
 settings feature rather than a complete dimensional-analysis engine.
