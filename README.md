@@ -1,4 +1,4 @@
-# LCA (Lluna Computational Analysis)
+Lluna Computational Analysis
 
 LCA (Lluna Computational Analysis) is a Windows desktop calculator and graphing
 application built with Tauri, Rust, TypeScript, and a native C++ math engine.
