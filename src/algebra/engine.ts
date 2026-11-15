@@ -5,6 +5,8 @@ type Expression =
   | { kind: 'number'; value: number }
   | { kind: 'variable'; name: string }
   | { kind: 'unary'; operator: '-'; value: Expression }
+  | { kind: 'root'; value: Expression; index: number }
+  | { kind: 'plusminus'; value: Expression }
   | { kind: 'binary'; operator: '+' | '-' | '*' | '/' | '^'; left: Expression; right: Expression };
 
 function tokenize(expression: string): string[] {
@@ -120,6 +122,7 @@ function polynomialFromExpression(expression: Expression): Polynomial {
   if (expression.kind === 'number') return new Map([[0, expression.value]]);
   if (expression.kind === 'variable') return new Map([[1, 1]]);
   if (expression.kind === 'unary') return scale(polynomialFromExpression(expression.value), -1);
+  if (expression.kind !== 'binary') throw new Error('Roots are not supported in Simplify yet');
   if (expression.operator === '+') return combine(polynomialFromExpression(expression.left), polynomialFromExpression(expression.right), 1);
   if (expression.operator === '-') return combine(polynomialFromExpression(expression.left), polynomialFromExpression(expression.right), -1);
   if (expression.operator === '*') return multiply(polynomialFromExpression(expression.left), polynomialFromExpression(expression.right));
@@ -136,6 +139,7 @@ function variableCount(expression: Expression, target: string): number {
   if (expression.kind === 'variable') return expression.name === target ? 1 : 0;
   if (expression.kind === 'number') return 0;
   if (expression.kind === 'unary') return variableCount(expression.value, target);
+  if (expression.kind === 'root' || expression.kind === 'plusminus') return variableCount(expression.value, target);
   return variableCount(expression.left, target) + variableCount(expression.right, target);
 }
 
@@ -167,6 +171,12 @@ function isolate(expression: Expression, target: string, value: Expression): Exp
       case '-': return isolate(expression.left, target, binary('+', value, expression.right));
       case '*': return isolate(expression.left, target, binary('/', value, expression.right));
       case '/': return isolate(expression.left, target, binary('*', value, expression.right));
+      case '^': {
+        if (expression.right.kind !== 'number' || !Number.isInteger(expression.right.value) || expression.right.value < 1) return null;
+        if (expression.right.value === 1) return isolate(expression.left, target, value);
+        const root: Expression = { kind: 'root', value, index: expression.right.value };
+        return isolate(expression.left, target, expression.right.value % 2 === 0 ? { kind: 'plusminus', value: root } : root);
+      }
       default: return null;
     }
   }
@@ -186,13 +196,31 @@ function expressionPrecedence(expression: Expression): number {
 
 function normalizeExpression(expression: Expression): Expression {
   if (expression.kind === 'number' || expression.kind === 'variable') return expression;
+  if (expression.kind === 'root' || expression.kind === 'plusminus') return { ...expression, value: normalizeExpression(expression.value) };
   if (expression.kind === 'unary') return { ...expression, value: normalizeExpression(expression.value) };
   const left = normalizeExpression(expression.left);
   const right = normalizeExpression(expression.right);
-  if (expression.operator === '*' && left.kind === 'number' && left.value === 1) return right;
-  if (expression.operator === '*' && right.kind === 'number' && right.value === 1) return left;
-  if (expression.operator === '*' && left.kind === 'number' && right.kind === 'number') return { kind: 'number', value: left.value * right.value };
-  if (expression.operator === '*' && right.kind === 'number' && left.kind !== 'number') return normalizeExpression(binary('*', right, left));
+  if (expression.operator === '*') {
+    const factors: Expression[] = [];
+    const collect = (factor: Expression): void => {
+      if (factor.kind === 'binary' && factor.operator === '*') {
+        collect(factor.left);
+        collect(factor.right);
+      } else {
+        factors.push(factor);
+      }
+    };
+    collect(left);
+    collect(right);
+    const numericFactor = factors.filter((factor): factor is { kind: 'number'; value: number } => factor.kind === 'number')
+      .reduce((product, factor) => product * factor.value, 1);
+    const nonNumeric = factors.filter((factor) => factor.kind !== 'number');
+    const ordered = (numericFactor === 1 ? nonNumeric : [{ kind: 'number', value: numericFactor } as Expression, ...nonNumeric])
+      .sort((a, b) => (a.kind === 'number' ? 0 : a.kind === 'variable' ? 1 : 2) - (b.kind === 'number' ? 0 : b.kind === 'variable' ? 1 : 2));
+    if (ordered.length === 0) return { kind: 'number', value: 1 };
+    return ordered.slice(1).reduce((result, factor) => binary('*', result, factor), ordered[0]);
+  }
+  if (expression.operator === '/' && right.kind === 'number' && right.value === 1) return left;
   if (expression.operator === '/' && right.kind === 'binary' && right.operator === '/') {
     return normalizeExpression(binary('/', binary('*', left, right.right), right.left));
   }
@@ -213,6 +241,10 @@ function expressionLatex(expression: Expression, parentPrecedence = 0): string {
   if (expression.kind === 'number') return coefficientText(expression.value);
   if (expression.kind === 'variable') return expression.name.replace(/_([A-Za-z0-9]+)/g, '_{$1}');
   if (expression.kind === 'unary') return `-${expressionLatex(expression.value, 4)}`;
+  if (expression.kind === 'plusminus') return `\\pm ${expressionLatex(expression.value, 4)}`;
+  if (expression.kind === 'root') return expression.index === 2
+    ? `\\sqrt{${expressionLatex(expression.value)}}`
+    : `\\sqrt[${expression.index}]{${expressionLatex(expression.value)}}`;
   if (expression.operator === '/') return `\\frac{${expressionLatex(expression.left)}}{${expressionLatex(expression.right)}}`;
   if (expression.operator === '*') return `${factorLatex(expression.left)}${factorLatex(expression.right)}`;
   const precedence = expressionPrecedence(expression);

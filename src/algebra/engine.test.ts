@@ -27,7 +27,7 @@ test('rearranges the initial reciprocal lens-equation form for f', () => {
 });
 
 test('reports unsupported rearrangement targets explicitly', () => {
-  assert.throws(() => rearrangeEquation('y = x^2', 'x'), /not supported/);
+  assert.throws(() => rearrangeEquation('y = x^z', 'x'), /not supported/);
 });
 
 test('rearranges general additive, multiplicative, and fractional equations', () => {
@@ -49,6 +49,13 @@ test('rearranges equations containing arbitrary variable names', () => {
 test('treats adjacent letters as separate variables', () => {
   assert.deepEqual(equationVariables(String.raw`\frac{1}{4x}t^2+uv=yw`), ['x', 't', 'u', 'v', 'y', 'w']);
   assert.equal(rearrangeEquation(String.raw`\frac{1}{4x}t^2+uv=yw`, 'u'), 'u = \\frac{yw - \\frac{1}{4x}t^{2}}{v}');
+});
+
+test('rearranges a squared variable with both roots', () => {
+  assert.equal(
+    rearrangeEquation(String.raw`\frac{1}{4x}t^2+uv=yw`, 't'),
+    String.raw`t = \pm \sqrt{4x\left(yw - uv\right)}`,
+  );
 });
 
 test('rearranges every target in the default lens equation', () => {
