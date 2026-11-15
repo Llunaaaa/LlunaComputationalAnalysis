@@ -66,20 +66,27 @@ export function renderAlgebra(container: HTMLElement): () => void {
         </div>`
       : `<div class="algebra-workspace">
           <div class="algebra-intro"><p class="eyebrow">Rearrange</p><h2 id="algebra-title">Rearrange an equation</h2><p>Choose a variable and solve the equation for that variable.</p></div>
-          <div class="algebra-card"><div class="algebra-box"><label class="algebra-field-label">Base equation</label><div class="algebra-field-host"></div></div><label class="algebra-field-label algebra-target-label">Solve for <input data-algebra-target list="algebra-variables" value="f" spellcheck="false"><datalist id="algebra-variables"></datalist></label><button type="button" class="algebra-action" data-algebra-run>Rearrange equation</button><div class="algebra-box algebra-result-box"><label class="algebra-field-label">Rearranged equation</label><div class="algebra-result-host"></div><small>Choose a variable and run Rearrange.</small></div></div>
+          <div class="algebra-card"><div class="algebra-box"><label class="algebra-field-label">Base equation</label><div class="algebra-field-host"></div></div><label class="algebra-field-label algebra-target-label">Solve for <select data-algebra-target></select></label><button type="button" class="algebra-action" data-algebra-run>Rearrange equation</button><div class="algebra-box algebra-result-box"><label class="algebra-field-label">Rearranged equation</label><div class="algebra-result-host"></div><small>Choose a variable and run Rearrange.</small></div></div>
         </div>`;
     const host = content.querySelector<HTMLDivElement>('.algebra-field-host')!;
     field = createAlgebraField('algebra-expression-field', activeTab === 'simplify' ? 'Expression to simplify' : 'Equation to rearrange', activeTab === 'simplify' ? '2(x+2)' : REARRANGE_EXAMPLE);
     field.setAttribute('placeholder', activeTab === 'simplify' ? '2(x + 2)' : 'Enter an equation');
     host.appendChild(field);
+    const target = activeTab === 'rearrange'
+      ? content.querySelector<HTMLSelectElement>('[data-algebra-target]')
+      : null;
     if (activeTab === 'rearrange') {
-      const variables = content.querySelector<HTMLDataListElement>('#algebra-variables')!;
+      if (!target) throw new Error('Rearrangement target control is missing');
       const updateVariables = (): void => {
-        variables.replaceChildren(...equationVariables(field!.value).map((variable) => {
+        const detected = equationVariables(field!.value);
+        const selected = target.value || detected[0] || '';
+        target.replaceChildren(...detected.map((variable) => {
           const option = document.createElement('option');
           option.value = variable;
+          option.textContent = variable;
           return option;
         }));
+        target.value = detected.includes(selected) ? selected : detected[0] || '';
       };
       field.addEventListener('input', updateVariables);
       updateVariables();
@@ -96,7 +103,7 @@ export function renderAlgebra(container: HTMLElement): () => void {
           result.textContent = simplifyExpression(field!.value);
           result.classList.remove('has-error');
         } else {
-          outputField!.value = readableFractions(rearrangeEquation(field!.value, content.querySelector<HTMLInputElement>('[data-algebra-target]')!.value.trim()));
+          outputField!.value = readableFractions(rearrangeEquation(field!.value, target!.value));
         }
       } catch (caught) {
         if (activeTab === 'simplify') {
