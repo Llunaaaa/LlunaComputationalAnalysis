@@ -72,79 +72,6 @@ class ExpressionParser {
   }
 }
 
-class PolynomialParser {
-  private readonly tokens: string[];
-  private position = 0;
-
-  constructor(expression: string) {
-    this.tokens = tokenize(expression);
-  }
-
-  parse(): Polynomial {
-    const result = this.additive();
-    if (this.position !== this.tokens.length) throw new Error('Unsupported expression structure');
-    return result;
-  }
-
-  private additive(): Polynomial {
-    let result = this.multiplicative();
-    while (this.peek() === '+' || this.peek() === '-') {
-      const operator = this.next();
-      const right = this.multiplicative();
-      result = combine(result, right, operator === '-' ? -1 : 1);
-    }
-    return result;
-  }
-
-  private multiplicative(): Polynomial {
-    let result = this.power();
-    while (this.peek() === '*' || this.startsPrimary()) {
-      if (this.peek() === '*') this.next();
-      result = multiply(result, this.power());
-    }
-    return result;
-  }
-
-  private power(): Polynomial {
-    const base = this.primary();
-    if (this.peek() !== '^') return base;
-    this.next();
-    const exponent = this.peek() === '('
-      ? (() => {
-        this.next();
-        const value = this.next();
-        if (this.next() !== ')') throw new Error('Invalid integer power');
-        return value;
-      })()
-      : this.next();
-    if (!exponent || !/^\d+$/.test(exponent)) throw new Error('Only non-negative integer powers are supported');
-    let result: Polynomial = new Map([[0, 1]]);
-    for (let index = 0; index < Number(exponent); index += 1) result = multiply(result, base);
-    return result;
-  }
-
-  private primary(): Polynomial {
-    const token = this.next();
-    if (!token) throw new Error('Expected an expression');
-    if (token === '(') {
-      const result = this.additive();
-      if (this.next() !== ')') throw new Error('Missing closing parenthesis');
-      return result;
-    }
-    if (token === '-') return scale(this.primary(), -1);
-    if (/^\d/.test(token)) return new Map([[0, Number(token)]]);
-    if (/^[A-Za-z_]/.test(token)) return new Map([[1, 1]]);
-    throw new Error('Unsupported expression structure');
-  }
-
-  private peek(): string | undefined { return this.tokens[this.position]; }
-  private next(): string | undefined { return this.tokens[this.position++]; }
-  private startsPrimary(): boolean {
-    const token = this.peek();
-    return Boolean(token && (token === '(' || /^\d/.test(token) || /^[A-Za-z_]/.test(token)));
-  }
-}
-
 function combine(left: Polynomial, right: Polynomial, sign: number): Polynomial {
   const result = new Map(left);
   for (const [degree, coefficient] of right) result.set(degree, (result.get(degree) ?? 0) + sign * coefficient);
@@ -186,6 +113,22 @@ function polynomialText(value: Polynomial): string {
       return `${sign}${index > 0 ? ' ' : ''}${coefficientPart}${variablePart}`.trim();
     })
     .join(' ');
+}
+
+function polynomialFromExpression(expression: Expression): Polynomial {
+  if (expression.kind === 'number') return new Map([[0, expression.value]]);
+  if (expression.kind === 'variable') return new Map([[1, 1]]);
+  if (expression.kind === 'unary') return scale(polynomialFromExpression(expression.value), -1);
+  if (expression.operator === '+') return combine(polynomialFromExpression(expression.left), polynomialFromExpression(expression.right), 1);
+  if (expression.operator === '-') return combine(polynomialFromExpression(expression.left), polynomialFromExpression(expression.right), -1);
+  if (expression.operator === '*') return multiply(polynomialFromExpression(expression.left), polynomialFromExpression(expression.right));
+  if (expression.operator === '/') throw new Error('Division is not supported in Simplify yet');
+  const exponent = expression.right.kind === 'number' ? expression.right.value : NaN;
+  if (!Number.isInteger(exponent) || exponent < 0) throw new Error('Only non-negative integer powers are supported');
+  let result: Polynomial = new Map([[0, 1]]);
+  const base = polynomialFromExpression(expression.left);
+  for (let index = 0; index < exponent; index += 1) result = multiply(result, base);
+  return result;
 }
 
 function variableCount(expression: Expression, target: string): number {
@@ -267,11 +210,11 @@ export function simplifyExpression(latex: string): string {
   const engineExpression = latexToEngine(latex).replace(/\s+/g, ' ').trim();
   const equals = engineExpression.indexOf('=');
   if (equals >= 0) {
-    const left = polynomialText(new PolynomialParser(engineExpression.slice(0, equals)).parse());
-    const right = polynomialText(new PolynomialParser(engineExpression.slice(equals + 1)).parse());
+    const left = polynomialText(polynomialFromExpression(new ExpressionParser(engineExpression.slice(0, equals)).parse()));
+    const right = polynomialText(polynomialFromExpression(new ExpressionParser(engineExpression.slice(equals + 1)).parse()));
     return `${left} = ${right}`;
   }
-  return polynomialText(new PolynomialParser(engineExpression).parse());
+  return polynomialText(polynomialFromExpression(new ExpressionParser(engineExpression).parse()));
 }
 
 export function rearrangeEquation(latex: string, target: string): string {
