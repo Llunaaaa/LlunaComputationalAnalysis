@@ -33,7 +33,13 @@ test('reports unsupported rearrangement targets explicitly', () => {
 test('rearranges general additive, multiplicative, and fractional equations', () => {
   assert.equal(rearrangeEquation('y = m*x + b', 'x'), 'x = \\frac{y - b}{m}');
   assert.equal(rearrangeEquation('a = 3x + 2', 'x'), 'x = \\frac{a - 2}{3}');
-  assert.equal(rearrangeEquation('p = (x - 4) / k', 'x'), 'x = p * k + 4');
+  assert.equal(rearrangeEquation('p = (x - 4) / k', 'x'), 'x = pk + 4');
+});
+
+test('renders rearranged multiplication without programming operators', () => {
+  const result = rearrangeEquation(String.raw`\frac{1}{4x}t^2+uv=yw`, 'yw');
+  assert.equal(result, String.raw`yw = \frac{1}{4x}t^{2} + uv`);
+  assert.doesNotMatch(result, /[*/]/);
 });
 
 test('rearranges equations containing arbitrary variable names', () => {

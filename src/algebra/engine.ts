@@ -183,15 +183,43 @@ function expressionPrecedence(expression: Expression): number {
   return 4;
 }
 
+function normalizeExpression(expression: Expression): Expression {
+  if (expression.kind === 'number' || expression.kind === 'variable') return expression;
+  if (expression.kind === 'unary') return { ...expression, value: normalizeExpression(expression.value) };
+  const left = normalizeExpression(expression.left);
+  const right = normalizeExpression(expression.right);
+  if (expression.operator === '*' && left.kind === 'number' && left.value === 1) return right;
+  if (expression.operator === '*' && right.kind === 'number' && right.value === 1) return left;
+  if (expression.operator === '*' && left.kind === 'number' && right.kind === 'number') return { kind: 'number', value: left.value * right.value };
+  if (expression.operator === '*' && right.kind === 'number' && left.kind !== 'number') return normalizeExpression(binary('*', right, left));
+  if (expression.operator === '/' && right.kind === 'binary' && right.operator === '/') {
+    return normalizeExpression(binary('/', binary('*', left, right.right), right.left));
+  }
+  if (expression.operator === '/' && left.kind === 'binary' && left.operator === '/') {
+    return normalizeExpression(binary('/', left.left, binary('*', left.right, right)));
+  }
+  return { ...expression, left, right };
+}
+
+function factorLatex(expression: Expression): string {
+  if (expression.kind === 'binary' && (expression.operator === '+' || expression.operator === '-')) {
+    return `\\left(${expressionLatex(expression)}\\right)`;
+  }
+  return expressionLatex(expression, 2);
+}
+
 function expressionLatex(expression: Expression, parentPrecedence = 0): string {
   if (expression.kind === 'number') return coefficientText(expression.value);
   if (expression.kind === 'variable') return expression.name.replace(/_/g, '\\_');
   if (expression.kind === 'unary') return `-${expressionLatex(expression.value, 4)}`;
   if (expression.operator === '/') return `\\frac{${expressionLatex(expression.left)}}{${expressionLatex(expression.right)}}`;
+  if (expression.operator === '*') return `${factorLatex(expression.left)}${factorLatex(expression.right)}`;
   const precedence = expressionPrecedence(expression);
   const left = expressionLatex(expression.left, precedence);
   const right = expressionLatex(expression.right, precedence + (expression.operator === '-' ? 1 : 0));
-  const text = `${left} ${expression.operator} ${right}`;
+  const text = expression.operator === '^'
+    ? `${factorLatex(expression.left)}^{${expressionLatex(expression.right)}}`
+    : `${left} ${expression.operator} ${right}`;
   return precedence < parentPrecedence ? `\\left(${text}\\right)` : text;
 }
 
@@ -228,7 +256,7 @@ export function rearrangeEquation(latex: string, target: string): string {
   const otherSide = containsVariable(left, target) ? right : left;
   if (!containsVariable(targetSide, target)) throw new Error(`Variable ${target} was not found in the equation`);
   const result = isolate(targetSide, target, otherSide);
-  if (result) return `${target} = ${expressionLatex(result)}`;
+  if (result) return `${target} = ${expressionLatex(normalizeExpression(result))}`;
   if (equation.includes('(n - 1)') && equation.includes('R_1') && equation.includes('R_2') && equation.includes('f')) {
     if (target === 'R_1') return String.raw`R_1 = \frac{1}{\frac{1}{f(n-1)}+\frac{1}{R_2}-\frac{(n-1)d}{nR_2}}`;
     if (target === 'R_2') return String.raw`R_2 = \frac{\frac{(n-1)d}{nR_1}-1}{\frac{1}{f(n-1)}-\frac{1}{R_1}}`;
