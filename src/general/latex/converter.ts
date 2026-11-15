@@ -507,6 +507,12 @@ class Converter {
  * unsupported notation with a user-facing message.
  */
 export function latexToEngine(latex: string): string {
-  if (!latex.trim()) return '';
-  return new Converter(tokenize(latex)).convert();
+  const trimmed = latex.trim();
+  if (!trimmed) return '';
+  const withoutDelimiters = trimmed
+    .replace(/^\\\(([\s\S]*)\\\)$/, '$1')
+    .replace(/^\\\[([\s\S]*)\\\]$/, '$1')
+    .replace(/^\$([\s\S]*)\$$/, '$1')
+    .trim();
+  return new Converter(tokenize(withoutDelimiters)).convert();
 }

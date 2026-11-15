@@ -50,6 +50,11 @@ test('converter errors', () => {
   assert.throws(() => latexToEngine('\\sum_{1}^{3} i'), /requires an index/);
 });
 
+test('converter ignores common outer LaTeX delimiters', () => {
+  const expression = String.raw`\(\frac{1}{2}x\)`;
+  assert.equal(latexToEngine(expression), latexToEngine(String.raw`\frac{1}{2}x`));
+});
+
 test('readable continued fractions preserve mathematical expressions', () => {
   const formatted = String.raw`\cfrac{1}{\cfrac{x+2}{y-3}}`;
   assert.equal(latexToEngine(formatted), latexToEngine(String.raw`\frac{1}{\frac{x+2}{y-3}}`));
