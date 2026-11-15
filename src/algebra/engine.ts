@@ -8,7 +8,8 @@ type Expression =
   | { kind: 'binary'; operator: '+' | '-' | '*' | '/' | '^'; left: Expression; right: Expression };
 
 function tokenize(expression: string): string[] {
-  return expression.match(/[A-Za-z_][A-Za-z0-9_]*|\d+(?:\.\d+)?|[()+\-*/^=]/g) ?? [];
+  const tokens = expression.match(/[A-Za-z_][A-Za-z0-9_]*|\d+(?:\.\d+)?|[()+\-*/^=]/g) ?? [];
+  return tokens.flatMap((token) => /^[A-Za-z]+$/.test(token) ? [...token] : [token]);
 }
 
 class ExpressionParser {
@@ -210,7 +211,7 @@ function factorLatex(expression: Expression): string {
 
 function expressionLatex(expression: Expression, parentPrecedence = 0): string {
   if (expression.kind === 'number') return coefficientText(expression.value);
-  if (expression.kind === 'variable') return expression.name.replace(/_/g, '\\_');
+  if (expression.kind === 'variable') return expression.name.replace(/_([A-Za-z0-9]+)/g, '_{$1}');
   if (expression.kind === 'unary') return `-${expressionLatex(expression.value, 4)}`;
   if (expression.operator === '/') return `\\frac{${expressionLatex(expression.left)}}{${expressionLatex(expression.right)}}`;
   if (expression.operator === '*') return `${factorLatex(expression.left)}${factorLatex(expression.right)}`;
@@ -231,7 +232,7 @@ function parseEquation(equation: string): [Expression, Expression] {
 
 export function equationVariables(latex: string): string[] {
   const equation = latexToEngine(latex).replace(/\s+/g, ' ').trim();
-  return [...new Set((equation.match(/[A-Za-z_][A-Za-z0-9_]*/g) ?? []))];
+  return [...new Set(tokenize(equation).filter((token) => /^[A-Za-z_]/.test(token)))];
 }
 
 export function simplifyExpression(latex: string): string {

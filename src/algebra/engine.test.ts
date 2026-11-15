@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rearrangeEquation, simplifyExpression } from './engine.ts';
+import { equationVariables, rearrangeEquation, simplifyExpression } from './engine.ts';
 
 test('simplifies a distributive expression', () => {
   assert.equal(simplifyExpression('2(x+2)'), '2x + 4');
@@ -37,13 +37,18 @@ test('rearranges general additive, multiplicative, and fractional equations', ()
 });
 
 test('renders rearranged multiplication without programming operators', () => {
-  const result = rearrangeEquation(String.raw`\frac{1}{4x}t^2+uv=yw`, 'yw');
-  assert.equal(result, String.raw`yw = \frac{1}{4x}t^{2} + uv`);
+  const result = rearrangeEquation(String.raw`\frac{1}{4x}t^2+uv=yw`, 'u');
+  assert.equal(result, String.raw`u = \frac{yw - \frac{1}{4x}t^{2}}{v}`);
   assert.doesNotMatch(result, /[*/]/);
 });
 
 test('rearranges equations containing arbitrary variable names', () => {
-  assert.equal(rearrangeEquation('total = rate * time', 'time'), 'time = \\frac{total}{rate}');
+  assert.equal(rearrangeEquation('A_1 = B_1 * C_1', 'C_1'), 'C_1 = \\frac{A_{1}}{B_{1}}');
+});
+
+test('treats adjacent letters as separate variables', () => {
+  assert.deepEqual(equationVariables(String.raw`\frac{1}{4x}t^2+uv=yw`), ['x', 't', 'u', 'v', 'y', 'w']);
+  assert.equal(rearrangeEquation(String.raw`\frac{1}{4x}t^2+uv=yw`, 'u'), 'u = \\frac{yw - \\frac{1}{4x}t^{2}}{v}');
 });
 
 test('rearranges every target in the default lens equation', () => {
