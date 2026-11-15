@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "LCA - Lluna Computational Analysis",
+  "productName": "Lluna Computational Analysis",
   "version": "0.1.0",
   "identifier": "com.lluna.computationalanalysis",
   "build": {
@@ -13,7 +13,7 @@
     "withGlobalTauri": false,
     "windows": [
       {
-        "title": "LCA - Lluna Computational Analysis",
+        "title": "Lluna Computational Analysis",
         "width": 800,
         "height": 600,
         "label": "main",
