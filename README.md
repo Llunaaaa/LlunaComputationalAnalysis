@@ -1,6 +1,6 @@
-# Computational Analysis
+# LCA (Lluna Computational Analysis)
 
-Computational Analysis is a Windows desktop calculator and graphing
+LCA (Lluna Computational Analysis) is a Windows desktop calculator and graphing
 application built with Tauri, Rust, TypeScript, and a native C++ math engine.
 It is an independent project inspired by the approachable interaction model of
 modern graphing calculators. It is not affiliated with or endorsed by Desmos.
