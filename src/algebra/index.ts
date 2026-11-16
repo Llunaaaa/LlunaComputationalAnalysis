@@ -18,6 +18,9 @@ function createAlgebraField(className: string, label: string, latex = ''): Mathf
       ...field.keybindings.filter((binding) => !(binding.key === '/' && binding.ifMode === 'math')),
       { key: '/', ifMode: 'math', command: ['insert', '\\dfrac{#@}{#?}'] },
     ];
+    const spacing = document.createElement('style');
+    spacing.textContent = '.ML__frac-line { margin-bottom: .12em !important; }';
+    field.shadowRoot?.append(spacing);
   }, { once: true });
   field.addEventListener('paste', (event) => {
     if (field.readOnly) return;
