@@ -22,26 +22,10 @@ function createAlgebraField(className: string, label: string, latex = ''): Mathf
   return field;
 }
 
-function fitResultField(field: MathfieldElement): void {
-  const content = field.shadowRoot?.querySelector<HTMLElement>('.ML__latex');
-  if (!content) return;
-  field.style.height = `${Math.max(76, content.getBoundingClientRect().height + 28)}px`;
-}
-
-function observeResultField(field: MathfieldElement): ResizeObserver | null {
-  const content = field.shadowRoot?.querySelector<HTMLElement>('.ML__latex');
-  if (!content) return null;
-  const observer = new ResizeObserver(() => fitResultField(field));
-  observer.observe(content);
-  fitResultField(field);
-  return observer;
-}
-
 export function renderAlgebra(container: HTMLElement): () => void {
   let activeTab: AlgebraTab = 'simplify';
   let field: MathfieldElement | null = null;
   let outputField: MathfieldElement | null = null;
-  let outputResizeObserver: ResizeObserver | null = null;
   container.innerHTML = `
     <section class="algebra-page" aria-labelledby="algebra-title">
       <div class="algebra-tabs" role="tablist" aria-label="Algebra operations">
@@ -56,8 +40,6 @@ export function renderAlgebra(container: HTMLElement): () => void {
   const renderActive = (): void => {
     field?.remove();
     field = null;
-    outputResizeObserver?.disconnect();
-    outputResizeObserver = null;
     outputField?.remove();
     outputField = null;
     content.innerHTML = activeTab === 'simplify'
@@ -97,12 +79,6 @@ export function renderAlgebra(container: HTMLElement): () => void {
       outputField = createAlgebraField('algebra-expression-field algebra-result-field', 'Rearranged equation');
       outputField.setAttribute('readonly', '');
       outputHost.appendChild(outputField);
-      outputResizeObserver = observeResultField(outputField);
-      if (!outputResizeObserver) {
-        outputField.addEventListener('mount', () => {
-          outputResizeObserver = observeResultField(outputField!);
-        }, { once: true });
-      }
     }
     const action = content.querySelector<HTMLButtonElement>('[data-algebra-run]')!;
     const result = content.querySelector<HTMLElement>('[data-algebra-result]')!;
@@ -114,7 +90,6 @@ export function renderAlgebra(container: HTMLElement): () => void {
           result.classList.remove('has-error');
         } else {
           outputField!.value = displayFractions(rearrangeEquation(field!.value, target!.value));
-          fitResultField(outputField!);
           if (feedback) feedback.textContent = '';
         }
       } catch (caught) {
@@ -123,7 +98,6 @@ export function renderAlgebra(container: HTMLElement): () => void {
           result.classList.add('has-error');
         } else {
           outputField!.value = '';
-          outputField!.style.height = '';
           if (feedback) feedback.textContent = caught instanceof Error ? caught.message : String(caught);
         }
       }
@@ -154,7 +128,6 @@ export function renderAlgebra(container: HTMLElement): () => void {
   renderActive();
   return () => {
     field?.remove();
-    outputResizeObserver?.disconnect();
     for (const tab of tabs) tab.removeEventListener('click', onTabClick);
     container.removeEventListener('keydown', onKeyDown);
   };
