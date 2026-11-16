@@ -19,7 +19,10 @@ function createAlgebraField(className: string, label: string, latex = ''): Mathf
       { key: '/', ifMode: 'math', command: ['insert', '\\dfrac{#@}{#?}'] },
     ];
     const spacing = document.createElement('style');
-    spacing.textContent = '.ML__frac-line { margin-bottom: .12em !important; }';
+    spacing.textContent = [
+      '.ML__frac-line { margin-bottom: .12em !important; }',
+      '.ML__base > .ML__mfrac > .ML__vlist-t > .ML__vlist-r:nth-of-type(3) { position: relative; top: .12em; }',
+    ].join('');
     field.shadowRoot?.append(spacing);
   }, { once: true });
   field.addEventListener('paste', (event) => {
