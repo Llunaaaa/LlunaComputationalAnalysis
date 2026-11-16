@@ -5,17 +5,43 @@ type AlgebraTab = 'simplify' | 'rearrange';
 
 const REARRANGE_EXAMPLE = '\\frac{1}{f}=(n-1)\\left(\\frac{1}{R_1}-\\frac{1}{R_2}+\\frac{(n-1)d}{nR_1R_2}\\right)';
 
+function displayFractions(latex: string): string {
+  return latex.replace(/\\(?:cfrac|frac|tfrac)\b/g, '\\dfrac');
+}
+
 function createAlgebraField(className: string, label: string, latex = ''): MathfieldElement {
   const field = createMathfield(className, label);
   field.minFontScale = 0.9;
-  field.value = latex;
+  field.addEventListener('mount', () => {
+    field.keybindings = [
+      ...field.keybindings.filter((binding) => !(binding.key === '/' && binding.ifMode === 'math')),
+      { key: '/', ifMode: 'math', command: ['insert', '\\dfrac{#@}{#?}'] },
+    ];
+  }, { once: true });
+  field.value = displayFractions(latex);
   return field;
+}
+
+function fitResultField(field: MathfieldElement): void {
+  const content = field.shadowRoot?.querySelector<HTMLElement>('.ML__latex');
+  if (!content) return;
+  field.style.height = `${Math.max(76, content.getBoundingClientRect().height + 28)}px`;
+}
+
+function observeResultField(field: MathfieldElement): ResizeObserver | null {
+  const content = field.shadowRoot?.querySelector<HTMLElement>('.ML__latex');
+  if (!content) return null;
+  const observer = new ResizeObserver(() => fitResultField(field));
+  observer.observe(content);
+  fitResultField(field);
+  return observer;
 }
 
 export function renderAlgebra(container: HTMLElement): () => void {
   let activeTab: AlgebraTab = 'simplify';
   let field: MathfieldElement | null = null;
   let outputField: MathfieldElement | null = null;
+  let outputResizeObserver: ResizeObserver | null = null;
   container.innerHTML = `
     <section class="algebra-page" aria-labelledby="algebra-title">
       <div class="algebra-tabs" role="tablist" aria-label="Algebra operations">
@@ -30,6 +56,8 @@ export function renderAlgebra(container: HTMLElement): () => void {
   const renderActive = (): void => {
     field?.remove();
     field = null;
+    outputResizeObserver?.disconnect();
+    outputResizeObserver = null;
     outputField?.remove();
     outputField = null;
     content.innerHTML = activeTab === 'simplify'
@@ -69,6 +97,12 @@ export function renderAlgebra(container: HTMLElement): () => void {
       outputField = createAlgebraField('algebra-expression-field algebra-result-field', 'Rearranged equation');
       outputField.setAttribute('readonly', '');
       outputHost.appendChild(outputField);
+      outputResizeObserver = observeResultField(outputField);
+      if (!outputResizeObserver) {
+        outputField.addEventListener('mount', () => {
+          outputResizeObserver = observeResultField(outputField!);
+        }, { once: true });
+      }
     }
     const action = content.querySelector<HTMLButtonElement>('[data-algebra-run]')!;
     const result = content.querySelector<HTMLElement>('[data-algebra-result]')!;
@@ -79,7 +113,8 @@ export function renderAlgebra(container: HTMLElement): () => void {
           result.textContent = simplifyExpression(field!.value);
           result.classList.remove('has-error');
         } else {
-          outputField!.value = rearrangeEquation(field!.value, target!.value);
+          outputField!.value = displayFractions(rearrangeEquation(field!.value, target!.value));
+          fitResultField(outputField!);
           if (feedback) feedback.textContent = '';
         }
       } catch (caught) {
@@ -88,6 +123,7 @@ export function renderAlgebra(container: HTMLElement): () => void {
           result.classList.add('has-error');
         } else {
           outputField!.value = '';
+          outputField!.style.height = '';
           if (feedback) feedback.textContent = caught instanceof Error ? caught.message : String(caught);
         }
       }
@@ -118,6 +154,7 @@ export function renderAlgebra(container: HTMLElement): () => void {
   renderActive();
   return () => {
     field?.remove();
+    outputResizeObserver?.disconnect();
     for (const tab of tabs) tab.removeEventListener('click', onTabClick);
     container.removeEventListener('keydown', onKeyDown);
   };
