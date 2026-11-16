@@ -17,6 +17,9 @@ function createAlgebraField(className: string, label: string, latex = ''): Mathf
       ...field.keybindings.filter((binding) => !(binding.key === '/' && binding.ifMode === 'math')),
       { key: '/', ifMode: 'math', command: ['insert', '\\dfrac{#@}{#?}'] },
     ];
+    const fractionSpacing = document.createElement('style');
+    fractionSpacing.textContent = '.ML__frac-line { margin-bottom: .1em !important; }';
+    field.shadowRoot?.append(fractionSpacing);
   }, { once: true });
   field.value = displayFractions(latex);
   return field;
