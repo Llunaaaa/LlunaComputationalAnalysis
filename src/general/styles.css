@@ -185,11 +185,9 @@ h1 {
 .algebra-result-box { border-top: 1px solid #202420; margin-top: 8px; padding-top: 16px; }
 .algebra-field-label { color: var(--light-gray); font-size: .82rem; font-weight: 600; }
 .algebra-field-host, .algebra-result-host { min-width: 0; }
-.algebra-expression-field { display: block; height: auto; min-height: 60px; width: 100%; border: 1px solid #363a36; border-radius: 8px; background: #111411; color: var(--white); padding: 10px 14px; font-size: 1.3rem; line-height: 1.25; --primary-color: var(--white); --selection-background-color: #363b36; --selection-color: var(--white); --caret-color: var(--accent); --placeholder-color: #687168; --frac-line-margin: .12em; }
+.algebra-expression-field { display: block; height: auto; min-height: 60px; width: 100%; border: 1px solid #363a36; border-radius: 8px; background: #111411; color: var(--white); padding: 10px 14px; font-size: 1.3rem; line-height: 1.25; --primary-color: var(--white); --selection-background-color: #363b36; --selection-color: var(--white); --caret-color: var(--accent); --placeholder-color: #687168; }
 .algebra-expression-field::part(content) { overflow-x: auto; }
-.algebra-result-field { min-height: 76px; padding-block: 18px; background: #0e110e; --caret-color: transparent; }
-.algebra-result-field::part(container) { align-items: center; }
-.algebra-result-field::part(content) { display: flex; align-items: center; min-height: 52px; }
+.algebra-result-field { min-height: 76px; background: #0e110e; --caret-color: transparent; }
 .algebra-action { justify-self: start; border: 1px solid #363a36; border-radius: 6px; background: #111411; color: var(--light-gray); cursor: pointer; padding: 9px 13px; }
 .algebra-action:hover { border-color: var(--accent); color: var(--white); }
 .algebra-result { display: grid; gap: 5px; border-top: 1px solid #202420; margin-top: 8px; padding-top: 15px; }

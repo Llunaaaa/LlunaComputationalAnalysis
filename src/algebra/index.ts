@@ -5,40 +5,10 @@ type AlgebraTab = 'simplify' | 'rearrange';
 
 const REARRANGE_EXAMPLE = '\\frac{1}{f}=(n-1)\\left(\\frac{1}{R_1}-\\frac{1}{R_2}+\\frac{(n-1)d}{nR_1R_2}\\right)';
 
-function readableFractions(latex: string): string {
-  return latex.replace(/\\(?:cfrac|frac|tfrac)\b/g, '\\dfrac');
-}
-
 function createAlgebraField(className: string, label: string, latex = ''): MathfieldElement {
   const field = createMathfield(className, label);
   field.minFontScale = 0.9;
-  // Display-style fractions keep nested numerators and denominators readable without shifting their baseline.
-  field.addEventListener('mount', () => {
-    field.keybindings = [
-      ...field.keybindings.filter((binding) => !(binding.key === '/' && binding.ifMode === 'math')),
-      { key: '/', ifMode: 'math', command: ['insert', '\\dfrac{#@}{#?}'] },
-    ];
-    const spacing = document.createElement('style');
-    spacing.textContent = '.ML__frac-line { margin-bottom: .12em !important; }';
-    field.shadowRoot?.append(spacing);
-  }, { once: true });
-  field.addEventListener('paste', (event) => {
-    if (field.readOnly) return;
-    const latex = event.clipboardData?.getData('application/x-latex') || event.clipboardData?.getData('text/plain');
-    if (!latex) return;
-    const formatted = readableFractions(latex);
-    if (formatted === latex) return;
-    event.preventDefault();
-    field.insert(formatted, { format: 'latex' });
-  });
-  field.addEventListener('beforeinput', (event) => {
-    if (field.readOnly || !(event instanceof InputEvent) || !event.cancelable || !event.data) return;
-    const formatted = readableFractions(event.data);
-    if (formatted === event.data) return;
-    event.preventDefault();
-    field.insert(formatted);
-  });
-  field.value = readableFractions(latex);
+  field.value = latex;
   return field;
 }
 
@@ -109,7 +79,7 @@ export function renderAlgebra(container: HTMLElement): () => void {
           result.textContent = simplifyExpression(field!.value);
           result.classList.remove('has-error');
         } else {
-          outputField!.value = readableFractions(rearrangeEquation(field!.value, target!.value));
+          outputField!.value = rearrangeEquation(field!.value, target!.value);
           if (feedback) feedback.textContent = '';
         }
       } catch (caught) {
